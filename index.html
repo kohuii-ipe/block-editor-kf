@@ -129,6 +129,87 @@
 				margin-bottom: 15px;
 				background-color: #f5f5f5;
 			}
+			/* --- ショートカット管理エリア --- */
+			#shortcutManagement {
+				border: 1px solid #ccc;
+				padding: 10px;
+				margin-bottom: 15px;
+				background-color: #f5f5f5;
+			}
+			#shortcutManagement button {
+				margin-bottom: 10px;
+			}
+			#shortcutList {
+				max-height: 300px;
+				overflow-y: auto;
+				margin-top: 10px;
+				padding: 5px;
+				border: 1px solid #ddd;
+				background-color: white;
+			}
+			.shortcut-item {
+				display: flex;
+				align-items: center;
+				padding: 8px;
+				margin-bottom: 5px;
+				border-bottom: 1px dotted #eee;
+			}
+			.shortcut-item:last-child {
+				border-bottom: none;
+			}
+			.shortcut-item label {
+				flex-shrink: 0;
+				width: 100px;
+				font-weight: bold;
+				font-size: 0.9em;
+				margin-right: 8px;
+				overflow: hidden;
+				text-overflow: ellipsis;
+				white-space: nowrap;
+			}
+			.shortcut-item select,
+			.shortcut-item input[type="text"] {
+				flex-grow: 1;
+				padding: 5px;
+				border: 1px solid #ccc;
+				border-radius: 4px;
+				font-size: 1em;
+			}
+			.shortcut-item button {
+				flex-shrink: 0;
+				margin-left: 8px;
+				padding: 5px 8px;
+				font-size: 0.85em;
+			}
+			/* モバイル対応 */
+			@media (max-width: 768px) {
+				body {
+					padding: 10px;
+					font-size: 14px;
+				}
+				.shortcut-item {
+					padding: 5px;
+				}
+				.shortcut-item label {
+					width: 70px;
+					font-size: 0.75em;
+					margin-right: 4px;
+					line-height: 1.2;
+				}
+				.shortcut-item input[type="text"] {
+					padding: 4px;
+					font-size: 0.85em;
+					min-width: 0;
+				}
+				.shortcut-item button {
+					margin-left: 4px;
+					padding: 4px 6px;
+					font-size: 0.75em;
+				}
+				#shortcutManagement {
+					padding: 8px;
+				}
+			}
 			#tagButtonList {
 				max-height: 200px;
 				overflow-y: auto;
@@ -188,14 +269,16 @@
 				text-decoration: none;
 				cursor: pointer;
 			}
-			#tagModalForm label {
+			#tagModalForm label,
+			#shortcutModalForm label {
 				display: block;
 				margin-top: 10px;
 				font-weight: bold;
 			}
 			#tagModalForm input[type="text"],
 			#tagModalForm select,
-			#tagModalForm textarea {
+			#tagModalForm textarea,
+			#shortcutModalForm input[type="text"] {
 				width: 95%;
 				padding: 8px;
 				margin: 5px 0 15px 0;
@@ -203,6 +286,14 @@
 				border: 1px solid #ccc;
 				border-radius: 4px;
 				box-sizing: border-box;
+			}
+			#shortcutModalForm button[type="submit"] {
+				margin-top: 10px;
+			}
+			#shortcutModalForm p {
+				margin-top: 0;
+				margin-bottom: 15px;
+				line-height: 1.4;
 			}
 
 			/* 出力エリアのスタイル */
@@ -258,6 +349,20 @@
 
 		<hr />
 
+		<!-- ショートカットキー管理エリア -->
+		<h2>ショートカットキー管理</h2>
+		<div id="shortcutManagement">
+			<p style="font-size: 0.9em; margin-bottom: 10px">
+				※テキスト選択時に使えるショートカットキーをカスタマイズします。
+			</p>
+			<button id="addNewShortcutButton">➕ 新しいショートカットを追加</button>
+			<div id="shortcutList">
+				<!-- ショートカット設定がJSでここに表示されます -->
+			</div>
+		</div>
+
+		<hr />
+
 		<!-- 入力エリア -->
 		<h2>入力エリア</h2>
 		<div id="container"></div>
@@ -278,17 +383,7 @@
 			<!-- 動的なボタンがここに追加されます -->
 		</div>
 		<p style="font-size: 0.9em; margin-top: 10px">
-			ショートカットキー:
-			<strong>strong</strong>
-			(Ctrl/Cmd + B),
-			<strong>mark</strong>
-			(Ctrl/Cmd + M),
-			<strong>sup</strong>
-			(Ctrl/Cmd + U),
-			<strong>li</strong>
-			(Ctrl/Cmd + L),
-			<strong>a href=""</strong>
-			(Ctrl/Cmd + K)
+			※ショートカットキーは上の「ショートカットキー管理」セクションでカスタマイズできます。
 		</p>
 
 		<hr />
@@ -323,6 +418,7 @@
 						<option value="list">[TEXT]置換 (UL, OLなど。各行がLIに)</option>
 						<option value="link">[TEXT]と[URL]置換 (リンク系。2行入力)</option>
 						<option value="p-list">[TEXT_P]と[TEXT_LIST]置換 (P+UL/OL系。複数行入力)</option>
+						<option value="link-list">[TEXT]と[URL]で繰り返し (複数リンクのリスト。交互に入力)</option>
 					</select>
 					<p style="font-size: 0.8em; color: #666; margin-top: -10px">
 						※入力エリアの動作（複数行の扱い、URLの取得など）を決定します。
@@ -334,10 +430,44 @@
 						rows="3"
 						placeholder='例: &lt;p class="custom"&gt;[TEXT]&lt;/p&gt;'></textarea>
 					<p style="font-size: 0.8em; color: #666; margin-top: -10px">
-						※タグタイプに合わせて、[TEXT], [URL], [TEXT_P], [TEXT_LIST] を使用できます。
+						※タグタイプに合わせて、[TEXT], [URL], [TEXT_P], [TEXT_LIST], [LINK_LIST] を使用できます。
 					</p>
 
+					<div id="linkItemTemplateSection" style="display: none;">
+						<label for="linkItemTemplateInput">リンク項目の雛形 (link-list用)</label>
+						<textarea
+							id="linkItemTemplateInput"
+							rows="2"
+							placeholder='例: &lt;li class="rtoc-item"&gt;&lt;a href="[URL]"&gt;[TEXT]&lt;/a&gt;&lt;/li&gt;'></textarea>
+						<p style="font-size: 0.8em; color: #666; margin-top: -10px">
+							※繰り返される各リンク項目の形式を [URL] と [TEXT] を使って定義します。
+						</p>
+					</div>
+
 					<button type="submit">保存</button>
+				</form>
+			</div>
+		</div>
+
+		<!-- ショートカット追加モーダル -->
+		<div id="shortcutModal" class="modal">
+			<div class="modal-content">
+				<span class="close" id="closeShortcutModal">&times;</span>
+				<h3>新しいショートカットキーの追加</h3>
+				<form id="shortcutModalForm">
+					<label for="shortcutKeyInput">キー (A-Z の1文字)</label>
+					<input type="text" id="shortcutKeyInput" maxlength="1" required placeholder="例: G, I, Pなど" />
+					<p style="font-size: 0.85em; color: #666;">
+						※Ctrl/Cmd (⌃) と組み合わせて使用します。A-Zの英字1文字を入力してください。
+					</p>
+
+					<label for="shortcutTagInput">タグ名</label>
+					<input type="text" id="shortcutTagInput" required placeholder="例: code, span, div" />
+					<p style="font-size: 0.85em; color: #666;">
+						※選択テキストを囲むHTMLタグ名を入力してください。
+					</p>
+
+					<button type="submit">追加</button>
 				</form>
 			</div>
 		</div>
@@ -368,7 +498,18 @@
 			const tagNameInput = document.getElementById("tagNameInput");
 			const tagTypeSelector = document.getElementById("tagTypeSelector");
 			const tagTemplateInput = document.getElementById("tagTemplateInput");
+			const linkItemTemplateSection = document.getElementById("linkItemTemplateSection");
+			const linkItemTemplateInput = document.getElementById("linkItemTemplateInput");
 			const closeModalSpan = tagModal.querySelector(".close");
+
+			// ショートカット管理関連
+			const shortcutList = document.getElementById("shortcutList");
+			const addNewShortcutButton = document.getElementById("addNewShortcutButton");
+			const shortcutModal = document.getElementById("shortcutModal");
+			const shortcutModalForm = document.getElementById("shortcutModalForm");
+			const shortcutKeyInput = document.getElementById("shortcutKeyInput");
+			const shortcutTagInput = document.getElementById("shortcutTagInput");
+			const closeShortcutModalSpan = document.getElementById("closeShortcutModal");
 
 			let areaIndex = 0;
 			let maxPatternId = 0;
@@ -437,6 +578,18 @@
 			// --- 永続化と初期化 ---
 			const STORAGE_KEY = "customTagPatternsV2";
 			const SETTINGS_KEY = "editorSettingsV2";
+			const SHORTCUTS_KEY = "keyboardShortcutsV2";
+
+			// デフォルトのショートカット設定
+			const defaultShortcuts = {
+				B: { tag: "strong", displayName: "⌃B" },
+				M: { tag: "mark", displayName: "⌃M" },
+				U: { tag: "sup", displayName: "⌃U" },
+				L: { tag: "li", displayName: "⌃L" },
+				K: { tag: "a", displayName: "⌃K" },
+			};
+
+			let keyboardShortcuts = {};
 
 			const saveAllPatterns = () => {
 				const selectedId = getSelectedPatternId();
@@ -447,6 +600,68 @@
 					selectedPattern: selectedId,
 				};
 				localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+			};
+
+			const saveShortcuts = () => {
+				localStorage.setItem(SHORTCUTS_KEY, JSON.stringify(keyboardShortcuts));
+			};
+
+			const loadShortcuts = () => {
+				const savedShortcuts = localStorage.getItem(SHORTCUTS_KEY);
+				if (savedShortcuts) {
+					try {
+						keyboardShortcuts = JSON.parse(savedShortcuts);
+					} catch (e) {
+						keyboardShortcuts = JSON.parse(JSON.stringify(defaultShortcuts));
+					}
+				} else {
+					keyboardShortcuts = JSON.parse(JSON.stringify(defaultShortcuts));
+				}
+			};
+
+			// ショートカット管理UIの構築
+			const buildShortcutUI = () => {
+				const shortcutList = document.getElementById("shortcutList");
+				if (!shortcutList) return;
+
+				shortcutList.innerHTML = "";
+
+				Object.keys(keyboardShortcuts).forEach((key) => {
+					const shortcut = keyboardShortcuts[key];
+					const item = document.createElement("div");
+					item.className = "shortcut-item";
+
+					const label = document.createElement("label");
+					label.textContent = shortcut.displayName;
+
+					const input = document.createElement("input");
+					input.type = "text";
+					input.value = shortcut.tag;
+					input.placeholder = "タグ名を入力 (例: strong, mark, code)";
+
+					input.addEventListener("input", (e) => {
+						keyboardShortcuts[key].tag = e.target.value.trim();
+						saveShortcuts();
+					});
+
+					const deleteButton = document.createElement("button");
+					deleteButton.textContent = "削除";
+					deleteButton.style.color = "red";
+					deleteButton.addEventListener("click", () => {
+						if (true) {
+							// TODO: カスタム確認モーダル推奨
+							console.log(`ショートカット「${shortcut.displayName}」を削除しました。`);
+							delete keyboardShortcuts[key];
+							buildShortcutUI();
+							saveShortcuts();
+						}
+					});
+
+					item.appendChild(label);
+					item.appendChild(input);
+					item.appendChild(deleteButton);
+					shortcutList.appendChild(item);
+				});
 			};
 
 			const loadAllPatterns = () => {
@@ -575,6 +790,7 @@
 								name: b.name,
 								template: b.template, // 修正: '' ではなく b.template をコピー
 								tagType: b.tagType,
+								linkItemTemplate: b.linkItemTemplate || "", // linkItemTemplateもコピー
 							}))
 						)
 					),
@@ -636,6 +852,7 @@
 					tagNameInput.value = button.name;
 					tagTypeSelector.value = button.tagType;
 					tagTemplateInput.value = button.template;
+					linkItemTemplateInput.value = button.linkItemTemplate || '<li class="rtoc-item"><a href="[URL]">[TEXT]</a></li>';
 				} else {
 					// 新規追加モード
 					modalTitle.textContent = "新しいタグボタンの追加";
@@ -643,6 +860,7 @@
 					tagNameInput.value = "";
 					tagTypeSelector.value = "single";
 					tagTemplateInput.value = "";
+					linkItemTemplateInput.value = '<li class="rtoc-item"><a href="[URL]">[TEXT]</a></li>';
 				}
 
 				// ★★★ 修正箇所 ★★★
@@ -665,12 +883,70 @@
 			// 「新しいタグボタンを追加」ボタン
 			addNewTagButton.addEventListener("click", () => openTagModal());
 
+			// --- ショートカット追加機能 ---
+
+			// ショートカットモーダルを開く
+			addNewShortcutButton.addEventListener("click", () => {
+				shortcutModal.style.display = "block";
+				shortcutKeyInput.value = "";
+				shortcutTagInput.value = "";
+			});
+
+			// ショートカットモーダルを閉じる
+			closeShortcutModalSpan.onclick = function () {
+				shortcutModal.style.display = "none";
+			};
+
+			// ショートカット追加フォームの送信
+			shortcutModalForm.addEventListener("submit", (e) => {
+				e.preventDefault();
+
+				const key = shortcutKeyInput.value.trim().toUpperCase();
+				const tag = shortcutTagInput.value.trim();
+
+				// バリデーション
+				if (!/^[A-Z]$/.test(key)) {
+					alert("A-Zの英字1文字を入力してください。");
+					return;
+				}
+
+				if (!tag) {
+					alert("タグ名を入力してください。");
+					return;
+				}
+
+				// 既存のショートカットがある場合は上書き確認
+				if (keyboardShortcuts[key]) {
+					if (!confirm(`⌃${key} は既に使用されています。上書きしますか？`)) {
+						return;
+					}
+				}
+
+				// ショートカットを追加
+				keyboardShortcuts[key] = {
+					tag: tag,
+					displayName: `⌃${key}`,
+				};
+
+				shortcutModal.style.display = "none";
+				buildShortcutUI();
+				saveShortcuts();
+			});
+
 			// ★★★ ここから修正箇所 ★★★
 
 			// 雛形テキストエリアのプレースホルダーを更新する関数
 			const updateTemplatePlaceholder = () => {
 				const selectedType = tagTypeSelector.value;
 				let placeholder = "";
+
+				// link-list用のフィールドの表示/非表示を切り替え
+				if (selectedType === "link-list") {
+					linkItemTemplateSection.style.display = "block";
+				} else {
+					linkItemTemplateSection.style.display = "none";
+				}
+
 				switch (selectedType) {
 					case "single":
 						placeholder = '例: <p class="custom">[TEXT]</p>';
@@ -683,6 +959,9 @@
 						break;
 					case "p-list":
 						placeholder = "例:\n<div>\n<p>[TEXT_P]</p>\n<ul>\n[TEXT_LIST]\n</ul>\n</div>";
+						break;
+					case "link-list":
+						placeholder = '例:\n<div class="wrapper">\n<ul>\n[LINK_LIST]\n</ul>\n</div>\n\n※[LINK_LIST]の位置に繰り返されるリンク項目が挿入されます';
 						break;
 					default:
 						placeholder = "[TEXT] を使って雛形を入力";
@@ -707,6 +986,7 @@
 				const newName = tagNameInput.value.trim();
 				const newType = tagTypeSelector.value;
 				const newTemplate = tagTemplateInput.value;
+				const newLinkItemTemplate = linkItemTemplateInput.value;
 
 				if (existingId) {
 					// 編集
@@ -715,6 +995,7 @@
 						button.name = newName;
 						button.tagType = newType;
 						button.template = newTemplate;
+						button.linkItemTemplate = newLinkItemTemplate;
 					}
 				} else {
 					// 新規追加
@@ -725,6 +1006,7 @@
 						name: newName,
 						template: newTemplate,
 						tagType: newType,
+						linkItemTemplate: newLinkItemTemplate,
 					});
 				}
 
@@ -885,6 +1167,36 @@
 					// 単一タグの処理 (single)
 					let content = text.trim().replace(/\n/g, "<br>");
 					output = templateString.replace(/\[TEXT\]/g, content);
+				} else if (tagType === "link-list") {
+					// リンクリストの処理 (link-list)
+					const lines = text.trim().split("\n").map((line) => line.trim()).filter((line) => line !== "");
+					let linkListContent = "";
+
+					// カスタムリンク項目テンプレートを取得（デフォルト値を設定）
+					const linkItemTemplate = tagInfo.linkItemTemplate || '<li class="rtoc-item"><a href="[URL]">[TEXT]</a></li>';
+
+					// 2行ずつペアにして処理 (奇数行:TEXT, 偶数行:URL)
+					for (let i = 0; i < lines.length; i += 2) {
+						const linkText = lines[i] || "";
+						const linkUrl = lines[i + 1] || "";
+
+						if (linkText && linkUrl) {
+							// カスタムテンプレートを使用して変換
+							const itemHtml = linkItemTemplate
+								.replace(/\[TEXT\]/g, linkText)
+								.replace(/\[URL\]/g, linkUrl);
+							linkListContent += itemHtml + "\n";
+						} else if (linkText) {
+							// URLがない場合は警告
+							linkListContent += `<!-- 警告: "${linkText}" のURLが指定されていません -->\n`;
+						}
+					}
+
+					if (linkListContent.trim() === "") {
+						linkListContent = `<li class="rtoc-item">リンク項目がありません</li>`;
+					}
+
+					output = templateString.replace(/\[LINK_LIST\]/g, linkListContent.trim());
 				}
 
 				// 最後に改行を加えておく (追記時に扱いやすいように)
@@ -974,6 +1286,8 @@
 					placeholderText = `${tagName}エリア。テキストを入力してください。改行は<br>になります。`;
 				} else if (tagType === "list") {
 					placeholderText = `${tagName}エリア。各行がliタグに変換されます。`;
+				} else if (tagType === "link-list") {
+					placeholderText = `${tagName}エリア。奇数行: リンクテキスト、偶数行: URL を交互に入力`;
 				}
 				newTextarea.placeholder = placeholderText;
 
@@ -1011,6 +1325,8 @@
 
 			// --- ページ初期化 ---
 			loadAllPatterns();
+			loadShortcuts();
+			buildShortcutUI(); // ショートカット管理UIを初期表示
 			rebuildTagButtonList(); // タグボタン管理一覧を初期表示
 
 			// --- その他の機能 (変更なし) ---
@@ -1065,27 +1381,19 @@
 				textarea.focus();
 			};
 
-			// キーボードショートカットイベントリスナー (変更なし)
+			// キーボードショートカットイベントリスナー (カスタマイズ対応版)
 			document.addEventListener("keydown", function (event) {
 				const isModifierKey = event.ctrlKey || event.metaKey;
 				if (isModifierKey) {
 					const key = event.key.toUpperCase();
-					let tagName = null;
-					if (key === "B") {
-						tagName = "strong";
-					} else if (key === "M") {
-						tagName = "mark";
-					} else if (key === "U") {
-						tagName = "sup";
-					} else if (key === "L") {
-						tagName = "li";
-					} else if (key === "K") {
-						tagName = "a";
-					}
 
-					if (tagName) {
-						event.preventDefault();
-						window.wrapSelectionWithTag(tagName);
+					// カスタマイズされたショートカット設定を使用
+					if (keyboardShortcuts[key]) {
+						const tagName = keyboardShortcuts[key].tag;
+						if (tagName) {
+							event.preventDefault();
+							window.wrapSelectionWithTag(tagName);
+						}
 					}
 				}
 			});
