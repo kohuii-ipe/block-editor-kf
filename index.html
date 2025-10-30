@@ -1,0 +1,1171 @@
+<!DOCTYPE html>
+<html lang="ja">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>タグカスタマイズ変換エディタ (カスタムタグ対応)</title>
+		<style>
+			/* サイト全体の幅を1200pxに固定し、中央寄せにする */
+			body {
+				max-width: 1200px;
+				margin: 0 auto;
+				padding: 20px;
+				box-sizing: border-box;
+				font-family: sans-serif;
+				font-size: 16px;
+			}
+
+			/* 変換パターン設定エリアのスタイル */
+
+			.pattern-selector {
+				margin-bottom: 10px;
+			}
+
+			/* パターン管理コントロールのスタイル */
+			#patternManagement {
+				border: 1px solid #ccc;
+				padding: 10px;
+				margin-top: 15px;
+				margin-bottom: 10px;
+				background-color: #f9f9f9;
+				display: flex;
+				gap: 10px;
+				align-items: center;
+			}
+			#patternManagement button {
+				padding: 8px 12px;
+				font-size: 0.9em;
+				min-height: 36px;
+				display: inline-flex;
+				align-items: center;
+				justify-content: center;
+			}
+
+			.pattern-selector label {
+				display: inline-block;
+				margin-right: 20px;
+				font-weight: bold;
+			}
+			/* 入力エリアのグループスタイル（高さ統一） */
+			.input-area-group {
+				display: flex;
+				align-items: stretch;
+				margin-bottom: 10px;
+			}
+			.input-area-group textarea {
+				flex-grow: 1;
+				width: 100%;
+				min-width: 0;
+				padding: 8px;
+				border: 1px solid #ccc;
+				border-radius: 4px;
+				font-family: inherit;
+				font-size: 1em;
+				box-sizing: border-box;
+			}
+			.input-area-group button {
+				flex-shrink: 0;
+				margin-left: 10px;
+				padding: 5px 15px;
+				align-self: flex-start;
+			}
+
+			/* タグ種別ラベルのスタイル */
+			.input-label-tag {
+				flex-shrink: 0;
+				width: 120px;
+				padding: 8px;
+				margin-right: 10px;
+				background-color: #f4f4f4;
+				border: 1px solid #ccc;
+				color: #333;
+				font-size: 1em;
+				font-weight: normal;
+				text-align: center;
+				align-self: stretch;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				white-space: pre-wrap;
+				flex-direction: column;
+				line-height: 1.3;
+			}
+
+			/* ナンバー部分のスタイルを標準サイズ (1em)・太字解除 (normal) に設定 */
+			.input-label-tag .number-prefix {
+				font-size: 1em;
+				font-weight: normal;
+				margin-bottom: 4px;
+			}
+
+			/* 挿入位置セレクタのスタイル */
+			#insertionPointControls {
+				margin-top: 15px;
+				margin-bottom: 15px;
+				padding: 10px;
+				border: 1px solid #eee;
+				background-color: #f9f9f9;
+			}
+			#insertionPointControls label {
+				font-weight: bold;
+				margin-right: 10px;
+			}
+			#insertionPointSelector {
+				padding: 5px;
+				border: 1px solid #ccc;
+				border-radius: 4px;
+				min-width: 300px;
+			}
+			/* タグ追加ボタン群 */
+			.tag-buttons button {
+				margin-right: 10px;
+				margin-bottom: 5px;
+			}
+
+			/* --- タグ管理エリア --- */
+			#tagButtonManagement {
+				border: 1px solid #ccc;
+				padding: 10px;
+				margin-bottom: 15px;
+				background-color: #f5f5f5;
+			}
+			#tagButtonList {
+				max-height: 200px;
+				overflow-y: auto;
+				margin-top: 10px;
+				padding: 5px;
+				border: 1px solid #ddd;
+				background-color: white;
+			}
+			.tag-item {
+				display: flex;
+				align-items: center;
+				padding: 5px;
+				border-bottom: 1px dotted #eee;
+			}
+			.tag-item:last-child {
+				border-bottom: none;
+			}
+			.tag-item span {
+				flex-grow: 1;
+				margin-right: 10px;
+				font-family: monospace;
+			}
+			.tag-item button {
+				margin-left: 5px;
+			}
+			/* モーダル */
+			.modal {
+				display: none;
+				position: fixed;
+				z-index: 1000;
+				left: 0;
+				top: 0;
+				width: 100%;
+				height: 100%;
+				overflow: auto;
+				background-color: rgba(0, 0, 0, 0.4);
+			}
+			.modal-content {
+				background-color: #fefefe;
+				margin: 10% auto;
+				padding: 20px;
+				border: 1px solid #888;
+				width: 80%;
+				max-width: 500px;
+				border-radius: 8px;
+				position: relative;
+			}
+			.close {
+				color: #aaa;
+				float: right;
+				font-size: 28px;
+				font-weight: bold;
+			}
+			.close:hover,
+			.close:focus {
+				color: #000;
+				text-decoration: none;
+				cursor: pointer;
+			}
+			#tagModalForm label {
+				display: block;
+				margin-top: 10px;
+				font-weight: bold;
+			}
+			#tagModalForm input[type="text"],
+			#tagModalForm select,
+			#tagModalForm textarea {
+				width: 95%;
+				padding: 8px;
+				margin: 5px 0 15px 0;
+				display: inline-block;
+				border: 1px solid #ccc;
+				border-radius: 4px;
+				box-sizing: border-box;
+			}
+
+			/* 出力エリアのスタイル */
+			#outputContainer {
+				margin-top: 20px;
+			}
+			#outputContainer pre {
+				background-color: #f5f5f5;
+				border: 1px solid #ddd;
+				border-radius: 4px;
+				padding: 15px;
+				max-width: 100%;
+				overflow-x: auto;
+				white-space: pre-wrap;
+				word-wrap: break-word;
+				word-break: break-all;
+			}
+			#outputContainer code {
+				font-family: 'Courier New', Courier, monospace;
+				font-size: 0.9em;
+				line-height: 1.5;
+			}
+		</style>
+	</head>
+	<body>
+		<!-- 変換パターン設定エリア -->
+		<h2>変換パターン設定</h2>
+
+		<div id="patternSelectorContainer" class="pattern-selector">
+			<!-- ラジオボタンはJSで動的に生成されます -->
+		</div>
+
+		<!-- パターン管理コントロール -->
+		<div id="patternManagement">
+			<button id="addPatternButton">➕ 新しいパターンを追加</button>
+			<button id="renamePatternButton">✍️ パターン名を変更</button>
+			<button id="deletePatternButton" disabled style="color: red">🗑️ パターンを削除</button>
+		</div>
+
+		<hr />
+
+		<!-- 新しいタグボタン管理エリア -->
+		<h2>タグボタン管理</h2>
+		<div id="tagButtonManagement">
+			<p style="font-size: 0.9em; margin-bottom: 10px">
+				※選択中のパターンに紐づく<strong>タグボタン</strong>をカスタマイズします。
+			</p>
+			<button id="addNewTagButton">➕ 新しいタグボタンを追加</button>
+			<div id="tagButtonList">
+				<!-- 既存のタグボタンがJSでここに表示されます -->
+			</div>
+		</div>
+
+		<hr />
+
+		<!-- 入力エリア -->
+		<h2>入力エリア</h2>
+		<div id="container"></div>
+
+		<!-- 挿入位置セレクタ -->
+		<div id="insertionPointControls">
+			<label for="insertionPointSelector">挿入位置を選択:</label>
+			<select id="insertionPointSelector">
+				<!-- オプションはJavaScriptで動的に生成されます -->
+			</select>
+			<p style="font-size: 0.8em; color: #666; margin-top: 5px">
+				※選択したエリアの<strong>直後</strong>に新しいタグが挿入されます。「<strong>リストの先頭</strong>」を選択すると、一番上に追加されます。
+			</p>
+		</div>
+
+		<!-- タグ追加ボタン群 (JSで動的に再生成されます) -->
+		<div id="tagButtonsContainer" class="tag-buttons">
+			<!-- 動的なボタンがここに追加されます -->
+		</div>
+		<p style="font-size: 0.9em; margin-top: 10px">
+			ショートカットキー:
+			<strong>strong</strong>
+			(Ctrl/Cmd + B),
+			<strong>mark</strong>
+			(Ctrl/Cmd + M),
+			<strong>sup</strong>
+			(Ctrl/Cmd + U),
+			<strong>li</strong>
+			(Ctrl/Cmd + L),
+			<strong>a href=""</strong>
+			(Ctrl/Cmd + K)
+		</p>
+
+		<hr />
+
+		<!-- 一括変換ボタン -->
+		<h2>HTMLコード出力</h2>
+		<button id="convertToAllButton">すべてを一括変換して追記</button>
+
+		<div id="outputContainer">
+			<h3>変換されたHTMLコード</h3>
+			<pre><code id="htmlCodeOutput"></code></pre>
+
+			<!-- コピーボタン -->
+			<button id="copyOutputButton">コードをコピー</button>
+			<button id="clearOutputButton">結果をクリア</button>
+		</div>
+
+		<!-- タグ追加/編集モーダル -->
+		<div id="tagModal" class="modal">
+			<div class="modal-content">
+				<span class="close">&times;</span>
+				<h3 id="modalTitle">新しいタグボタンの追加</h3>
+				<form id="tagModalForm">
+					<input type="hidden" id="tagIdInput" />
+
+					<label for="tagNameInput">ボタン名 (例: 大見出し, 外部リンク, 枠)</label>
+					<input type="text" id="tagNameInput" required />
+
+					<label for="tagTypeSelector">タグタイプ (動作モード)</label>
+					<select id="tagTypeSelector">
+						<option value="single">[TEXT]置換 (P, H, BOXなど)</option>
+						<option value="list">[TEXT]置換 (UL, OLなど。各行がLIに)</option>
+						<option value="link">[TEXT]と[URL]置換 (リンク系。2行入力)</option>
+						<option value="p-list">[TEXT_P]と[TEXT_LIST]置換 (P+UL/OL系。複数行入力)</option>
+					</select>
+					<p style="font-size: 0.8em; color: #666; margin-top: -10px">
+						※入力エリアの動作（複数行の扱い、URLの取得など）を決定します。
+					</p>
+
+					<label for="tagTemplateInput">雛形 (テンプレート)</label>
+					<textarea
+						id="tagTemplateInput"
+						rows="3"
+						placeholder='例: &lt;p class="custom"&gt;[TEXT]&lt;/p&gt;'></textarea>
+					<p style="font-size: 0.8em; color: #666; margin-top: -10px">
+						※タグタイプに合わせて、[TEXT], [URL], [TEXT_P], [TEXT_LIST] を使用できます。
+					</p>
+
+					<button type="submit">保存</button>
+				</form>
+			</div>
+		</div>
+	</body>
+	<script>
+		document.addEventListener("DOMContentLoaded", function () {
+			// --- 要素の取得 ---
+			const convertAllButton = document.getElementById("convertToAllButton");
+			const clearOutputButton = document.getElementById("clearOutputButton");
+			const copyOutputButton = document.getElementById("copyOutputButton");
+			const container = document.getElementById("container");
+			const insertionPointSelector = document.getElementById("insertionPointSelector");
+			const htmlCodeOutput = document.getElementById("htmlCodeOutput");
+
+			const patternSelectorContainer = document.getElementById("patternSelectorContainer");
+			const addPatternButton = document.getElementById("addPatternButton");
+			const renamePatternButton = document.getElementById("renamePatternButton");
+			const deletePatternButton = document.getElementById("deletePatternButton");
+			const tagButtonsContainer = document.getElementById("tagButtonsContainer"); // 新しいボタンコンテナ
+
+			// タグ管理関連
+			const addNewTagButton = document.getElementById("addNewTagButton");
+			const tagButtonList = document.getElementById("tagButtonList");
+			const tagModal = document.getElementById("tagModal");
+			const modalTitle = document.getElementById("modalTitle");
+			const tagModalForm = document.getElementById("tagModalForm");
+			const tagIdInput = document.getElementById("tagIdInput");
+			const tagNameInput = document.getElementById("tagNameInput");
+			const tagTypeSelector = document.getElementById("tagTypeSelector");
+			const tagTemplateInput = document.getElementById("tagTemplateInput");
+			const closeModalSpan = tagModal.querySelector(".close");
+
+			let areaIndex = 0;
+			let maxPatternId = 0;
+			let maxTagId = 0;
+
+			// --- 雛形設定のデフォルトデータ（構造変更） ---
+			const defaultTagButtons = [
+				// id, name, template, tagType (single, list, link, p-list)
+				{ id: "p", name: "pタグ", template: "<p>[TEXT]</p>", tagType: "single" },
+				{ id: "h2", name: "h2タグ", template: "<h2>[TEXT]</h2>", tagType: "single" },
+				{
+					id: "a-int",
+					name: "内部リンク",
+					template: '<a href="[URL]">[TEXT]</a>',
+					tagType: "link",
+				},
+				{
+					id: "a-ext",
+					name: "外部リンク",
+					template: '<a href="[URL]" target="_blank">[TEXT]</a>',
+					tagType: "link",
+				},
+				{ id: "ul", name: "ULタグ", template: "<ul>\n[TEXT]\n</ul>", tagType: "list" },
+				{ id: "box", name: "枠", template: '<div class="box">\n[TEXT]\n</div>', tagType: "single" },
+				{
+					id: "box-p-ul",
+					name: "箇条書きリスト",
+					template: '<div class="box"><p>[TEXT_P]</p><ul>\n[TEXT_LIST]\n</ul></div>',
+					tagType: "p-list",
+				},
+			];
+
+			const defaultPatterns = {
+				pattern1: {
+					name: "ソニー (デフォルト)",
+					buttons: JSON.parse(JSON.stringify(defaultTagButtons)), // ディープコピー
+				},
+				pattern2: {
+					name: "カスタム例",
+					buttons: [
+						{
+							id: "p-red",
+							name: "赤文字P",
+							template: '<p style="color:red;">[TEXT]</p>',
+							tagType: "single",
+						},
+						{
+							id: "h2-border",
+							name: "下線H2",
+							template: '<h2 style="border-bottom: 2px solid black;">[TEXT]</h2>',
+							tagType: "single",
+						},
+						{
+							id: "note",
+							name: "注意枠",
+							template:
+								'<div class="note" style="border: 1px solid red; padding: 10px;">\n<p style="font-weight: bold;">注意：</p>\n[TEXT]\n</div>',
+							tagType: "single",
+						},
+					],
+				},
+			};
+
+			let patterns = {}; // すべてのパターン設定を保持するグローバルオブジェクト
+
+			// --- 永続化と初期化 ---
+			const STORAGE_KEY = "customTagPatternsV2";
+			const SETTINGS_KEY = "editorSettingsV2";
+
+			const saveAllPatterns = () => {
+				const selectedId = getSelectedPatternId();
+
+				localStorage.setItem(STORAGE_KEY, JSON.stringify(patterns));
+
+				const settings = {
+					selectedPattern: selectedId,
+				};
+				localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+			};
+
+			const loadAllPatterns = () => {
+				const savedPatterns = localStorage.getItem(STORAGE_KEY);
+				if (savedPatterns) {
+					try {
+						patterns = JSON.parse(savedPatterns);
+						if (Object.keys(patterns).length === 0) {
+							patterns = defaultPatterns;
+						}
+
+						// IDの最大値を更新
+						Object.keys(patterns).forEach((id) => {
+							const num = parseInt(id.replace("pattern", ""));
+							if (!isNaN(num)) {
+								maxPatternId = Math.max(maxPatternId, num);
+							}
+							// タグIDの最大値も更新
+							patterns[id].buttons.forEach((button) => {
+								if (button.id.startsWith("custom")) {
+									const tagNum = parseInt(button.id.replace("custom", ""));
+									if (!isNaN(tagNum)) {
+										maxTagId = Math.max(maxTagId, tagNum);
+									}
+								}
+							});
+						});
+					} catch (e) {
+						patterns = defaultPatterns;
+					}
+				} else {
+					patterns = defaultPatterns;
+				}
+
+				const savedSettings = localStorage.getItem(SETTINGS_KEY);
+				let initialSelectedPattern = "pattern1";
+				if (savedSettings) {
+					try {
+						const settings = JSON.parse(savedSettings);
+						initialSelectedPattern = settings.selectedPattern || "pattern1";
+					} catch (e) {
+						// do nothing
+					}
+				}
+
+				rebuildPatternUI(initialSelectedPattern);
+				rebuildTagButtons(); // タグボタン群も初期化時に生成
+				updateInsertionPoints(); // 入力エリアのリストを更新
+			};
+
+			// --- UI構築とパターン切り替え機能 ---
+			const getSelectedPatternId = () => {
+				const checked = document.querySelector('input[name="conversionPattern"]:checked');
+				return checked ? checked.value : Object.keys(patterns)[0];
+			};
+
+			const rebuildPatternUI = (initialSelectedId) => {
+				patternSelectorContainer.innerHTML = "";
+
+				let firstId = null;
+				let selectedId = initialSelectedId;
+
+				Object.keys(patterns).forEach((id, index) => {
+					if (index === 0) firstId = id;
+					const pattern = patterns[id];
+
+					// 1. ラジオボタンの生成
+					const label = document.createElement("label");
+					const input = document.createElement("input");
+					input.type = "radio";
+					input.name = "conversionPattern";
+					input.id = id;
+					input.value = id;
+					input.addEventListener("change", () => {
+						rebuildTagButtons(); // パターン切り替え時、ボタンを再生成
+						rebuildTagButtonList(); // タグボタン管理一覧を更新
+						saveAllPatterns();
+					});
+
+					const nameSpan = document.createElement("span");
+					nameSpan.id = `label-name-${id}`;
+					nameSpan.textContent = pattern.name;
+
+					label.appendChild(input);
+					label.appendChild(nameSpan);
+					patternSelectorContainer.appendChild(label);
+				});
+
+				// 3. 初期選択と表示状態の設定
+				const finalSelectedId = patterns[selectedId] ? selectedId : firstId;
+				if (finalSelectedId) {
+					const selectedRadio = document.getElementById(finalSelectedId);
+					if (selectedRadio) {
+						selectedRadio.checked = true;
+					}
+				}
+
+				updateDeleteButtonState();
+			};
+
+			// 削除ボタンの disabled 状態を更新
+			const updateDeleteButtonState = () => {
+				const count = Object.keys(patterns).length;
+				deletePatternButton.disabled = count <= 1;
+			};
+
+			// --- パターン管理ボタンの機能 ---
+
+			addPatternButton.addEventListener("click", () => {
+				maxPatternId++;
+				const newId = `pattern${maxPatternId}`;
+				const newName = `新しいパターン ${maxPatternId}`;
+
+				// ★★★ 修正箇所 ★★★
+				// 既存のパターンのボタン定義をディープコピー（テンプレートもそのままコピー）
+				const sourcePattern =
+					patterns[getSelectedPatternId()] || patterns[Object.keys(patterns)[0]];
+
+				patterns[newId] = {
+					name: newName,
+					// テンプレート(template)もそのままコピーするように修正
+					buttons: JSON.parse(
+						JSON.stringify(
+							sourcePattern.buttons.map((b) => ({
+								id: b.id,
+								name: b.name,
+								template: b.template, // 修正: '' ではなく b.template をコピー
+								tagType: b.tagType,
+							}))
+						)
+					),
+				};
+
+				rebuildPatternUI(newId);
+				rebuildTagButtons();
+				rebuildTagButtonList();
+				saveAllPatterns();
+			});
+
+			renamePatternButton.addEventListener("click", () => {
+				const selectedId = getSelectedPatternId();
+				const currentPattern = patterns[selectedId];
+				if (!currentPattern) return;
+
+				const newName = prompt("新しいパターン名を入力してください:", currentPattern.name);
+				if (newName !== null && newName.trim() !== "") {
+					currentPattern.name = newName.trim();
+					document.getElementById(`label-name-${selectedId}`).textContent = newName.trim();
+					saveAllPatterns();
+				}
+			});
+
+			deletePatternButton.addEventListener("click", () => {
+				const selectedId = getSelectedPatternId();
+				if (Object.keys(patterns).length <= 1) {
+					// alert("パターンは最低1つ必要です。");
+					// アラートの代わりにカスタムUIやコンソールログを使用
+					console.warn("パターンは最低1つ必要です。");
+					return;
+				}
+
+				const currentPattern = patterns[selectedId];
+				// confirm の代わりに true で続行 (Canvas環境ではconfirmが機能しないため)
+				// if (confirm(`パターン「${currentPattern.name}」を削除してもよろしいですか？`)) {
+				if (true) {
+					// TODO: 本番環境ではカスタムモーダルでの確認を推奨
+					console.log(`パターン「${currentPattern.name}」を削除しました。`);
+					delete patterns[selectedId];
+
+					const firstId = Object.keys(patterns)[0];
+					rebuildPatternUI(firstId);
+					rebuildTagButtons();
+					rebuildTagButtonList();
+					saveAllPatterns();
+				}
+			});
+
+			// --- タグボタン管理機能 ---
+
+			// モーダルの表示 (追加/編集)
+			const openTagModal = (button = null) => {
+				tagModal.style.display = "block";
+				if (button) {
+					// 編集モード
+					modalTitle.textContent = "タグボタンの編集";
+					tagIdInput.value = button.id;
+					tagNameInput.value = button.name;
+					tagTypeSelector.value = button.tagType;
+					tagTemplateInput.value = button.template;
+				} else {
+					// 新規追加モード
+					modalTitle.textContent = "新しいタグボタンの追加";
+					tagIdInput.value = "";
+					tagNameInput.value = "";
+					tagTypeSelector.value = "single";
+					tagTemplateInput.value = "";
+				}
+
+				// ★★★ 修正箇所 ★★★
+				// モーダル表示時にプレースホルダーを更新
+				updateTemplatePlaceholder();
+				// ★★★ 修正箇所ここまで ★★★
+			};
+
+			// モーダルの閉じる処理
+			closeModalSpan.onclick = function () {
+				tagModal.style.display = "none";
+			};
+			// 外側クリックでモーダルを閉じる機能は無効化（誤操作防止のため）
+			// window.onclick = function (event) {
+			// 	if (event.target == tagModal) {
+			// 		tagModal.style.display = "none";
+			// 	}
+			// };
+
+			// 「新しいタグボタンを追加」ボタン
+			addNewTagButton.addEventListener("click", () => openTagModal());
+
+			// ★★★ ここから修正箇所 ★★★
+
+			// 雛形テキストエリアのプレースホルダーを更新する関数
+			const updateTemplatePlaceholder = () => {
+				const selectedType = tagTypeSelector.value;
+				let placeholder = "";
+				switch (selectedType) {
+					case "single":
+						placeholder = '例: <p class="custom">[TEXT]</p>';
+						break;
+					case "list":
+						placeholder = "例:\n<ul>\n[TEXT]\n</ul>\n\n※[TEXT]は各行が<li>...</li>に置換されます";
+						break;
+					case "link":
+						placeholder = '例: <a href="[URL]">[TEXT]</a>';
+						break;
+					case "p-list":
+						placeholder = "例:\n<div>\n<p>[TEXT_P]</p>\n<ul>\n[TEXT_LIST]\n</ul>\n</div>";
+						break;
+					default:
+						placeholder = "[TEXT] を使って雛形を入力";
+				}
+				tagTemplateInput.placeholder = placeholder;
+			};
+
+			// タグタイプセレクタが変更されたら、プレースホルダーを更新
+			tagTypeSelector.addEventListener("change", updateTemplatePlaceholder);
+
+			// ★★★ 修正箇所ここまで ★★★
+
+			// タグ保存 (追加/編集) 処理
+			tagModalForm.addEventListener("submit", (e) => {
+				e.preventDefault();
+
+				const patternId = getSelectedPatternId();
+				const currentPattern = patterns[patternId];
+				if (!currentPattern) return;
+
+				const existingId = tagIdInput.value;
+				const newName = tagNameInput.value.trim();
+				const newType = tagTypeSelector.value;
+				const newTemplate = tagTemplateInput.value;
+
+				if (existingId) {
+					// 編集
+					const button = currentPattern.buttons.find((b) => b.id === existingId);
+					if (button) {
+						button.name = newName;
+						button.tagType = newType;
+						button.template = newTemplate;
+					}
+				} else {
+					// 新規追加
+					maxTagId++;
+					const newId = `custom${maxTagId}`;
+					currentPattern.buttons.push({
+						id: newId,
+						name: newName,
+						template: newTemplate,
+						tagType: newType,
+					});
+				}
+
+				tagModal.style.display = "none";
+				rebuildTagButtons();
+				rebuildTagButtonList();
+				saveAllPatterns();
+			});
+
+			// タグボタン一覧の構築
+			const rebuildTagButtonList = () => {
+				tagButtonList.innerHTML = "";
+				const patternId = getSelectedPatternId();
+				const currentPattern = patterns[patternId];
+
+				if (!currentPattern || currentPattern.buttons.length === 0) {
+					tagButtonList.textContent = "タグボタンがありません。";
+					return;
+				}
+
+				currentPattern.buttons.forEach((button) => {
+					const item = document.createElement("div");
+					item.className = "tag-item";
+
+					const infoSpan = document.createElement("span");
+					infoSpan.textContent = `${button.name} (${button.tagType})`;
+
+					const editButton = document.createElement("button");
+					editButton.textContent = "編集";
+					editButton.addEventListener("click", () => openTagModal(button));
+
+					const deleteButton = document.createElement("button");
+					deleteButton.textContent = "削除";
+					deleteButton.style.color = "red";
+					deleteButton.addEventListener("click", () => {
+						// if (confirm(`タグ「${button.name}」を削除してもよろしいですか？`)) {
+						if (true) {
+							// TODO: カスタム確認モーダル推奨
+							console.log(`タグ「${button.name}」を削除しました。`);
+							currentPattern.buttons = currentPattern.buttons.filter((b) => b.id !== button.id);
+							rebuildTagButtons();
+							rebuildTagButtonList();
+							saveAllPatterns();
+						}
+					});
+
+					item.appendChild(infoSpan);
+					item.appendChild(editButton);
+					item.appendChild(deleteButton);
+					tagButtonList.appendChild(item);
+				});
+			};
+
+			// --- タグボタン群の動的生成 ---
+
+			const rebuildTagButtons = () => {
+				tagButtonsContainer.innerHTML = "";
+				const patternId = getSelectedPatternId();
+				const currentPattern = patterns[patternId];
+				if (!currentPattern) return;
+
+				currentPattern.buttons.forEach((button) => {
+					const btn = document.createElement("button");
+					btn.id = `addTagButton-${button.id}`;
+					btn.textContent = button.name;
+
+					// イベントリスナーを動的に割り当て
+					btn.addEventListener("click", () =>
+						createTextarea(button.id, button.tagType, button.name)
+					);
+
+					tagButtonsContainer.appendChild(btn);
+				});
+			};
+
+			// --- 変換ロジックの修正 ---
+
+			/**
+			 * 選択されたパターンIDとタグIDに基づいてカスタムテンプレートとタイプを取得する関数
+			 */
+			const getCustomTagInfo = (tagId) => {
+				const patternId = getSelectedPatternId();
+				const currentPattern = patterns[patternId];
+				if (!currentPattern) return null;
+
+				return currentPattern.buttons.find((b) => b.id === tagId);
+			};
+
+			// 共通の変換ロジック (タグタイプに応じて処理を振り分けるように変更)
+			function convertTextToHtmlString(textareaElement) {
+				const text = textareaElement.value;
+				if (!text || text.trim() === "") return ""; // 空白/空の場合は空文字を返す
+
+				const tagId = textareaElement.getAttribute("data-tag-id");
+				const tagInfo = getCustomTagInfo(tagId);
+
+				// タグ情報がない場合は、HTMLコメントとして警告を返す
+				if (!tagInfo) return `<!-- 警告: 不明なタグID (${tagId}) のためスキップされました -->\n`;
+
+				// ★★★
+				// テンプレートが空文字列の場合、警告を返すように修正
+				// (修正しない場合、空文字列が返され、trim()で消えてしまうため)
+				const templateString = tagInfo.template;
+				if (templateString.trim() === "") {
+					return `<!-- 警告: タグ (${tagInfo.name}) の雛形が空のためスキップされました -->\n`;
+				}
+				// ★★★
+
+				const tagType = tagInfo.tagType;
+				let output = "";
+
+				if (tagType === "link") {
+					// リンクタグ系の特別処理 (link)
+					const lines = text
+						.trim()
+						.split("\n")
+						.map((line) => line.trim());
+					const linkText = lines[0] || "リンク";
+					const url = lines[1] || "";
+
+					if (url) {
+						output = templateString.replace(/\[TEXT\]/g, linkText).replace(/\[URL\]/g, url);
+					} else {
+						output = `<!-- 警告: リンクエリアですがURLが2行目に指定されていません (${linkText}) -->\n`;
+					}
+				} else if (tagType === "p-list") {
+					// P+リストタグの処理 (p-list)
+					const lines = text.trim().split("\n");
+					const pText = lines[0] ? lines[0].trim().replace(/\n/g, "<br>") : "リストのタイトル";
+					const listLines = lines.slice(1).filter((line) => line.trim() !== "");
+
+					let listContent = "";
+					if (listLines.length > 0) {
+						listContent = listLines.map((line) => `<li>${line.trim()}</li>`).join("\n");
+					} else {
+						listContent = `<li>リスト項目がありません</li>`;
+					}
+
+					output = templateString
+						.replace(/\[TEXT_P\]/g, pText)
+						.replace(/\[TEXT_LIST\]/g, listContent);
+				} else if (tagType === "list") {
+					// リストタグの処理 (list)
+					let listContent = text
+						.trim()
+						.split("\n")
+						.filter((line) => line.trim() !== "")
+						.map((line) => {
+							// すでにliタグが含まれていたらそのまま、そうでなければliタグで囲む
+							return line.match(/^\s*<li/i) ? line : `<li>${line.trim()}</li>`;
+						})
+						.join("\n");
+
+					if (listContent.trim() === "") listContent = `<li>リスト項目がありません</li>`;
+
+					output = templateString.replace(/\[TEXT\]/g, listContent);
+				} else if (tagType === "single") {
+					// 単一タグの処理 (single)
+					let content = text.trim().replace(/\n/g, "<br>");
+					output = templateString.replace(/\[TEXT\]/g, content);
+				}
+
+				// 最後に改行を加えておく (追記時に扱いやすいように)
+				return output + "\n";
+			}
+
+			// 挿入位置セレクタを更新する関数 (変更なし)
+			const updateInsertionPoints = () => {
+				const selectedValue = insertionPointSelector.value;
+
+				insertionPointSelector.innerHTML = "";
+
+				const allGroups = container.querySelectorAll(".input-area-group");
+
+				const optionStart = document.createElement("option");
+				optionStart.value = "start";
+				optionStart.textContent = "リストの先頭 (#1 として追加)";
+				insertionPointSelector.appendChild(optionStart);
+
+				allGroups.forEach((group, index) => {
+					const tagId = group.querySelector(".input-text-area").getAttribute("data-tag-id");
+					// getCustomTagInfo を使って最新のタグ名を取得
+					const tagInfo = getCustomTagInfo(tagId) || { name: "不明なタグ" };
+
+					const currentNumber = index + 1;
+					const numberPrefix = group.querySelector(".number-prefix");
+					if (numberPrefix) {
+						numberPrefix.textContent = `#${currentNumber}`;
+					}
+
+					const option = document.createElement("option");
+					option.value = group.id;
+					option.textContent = `#${currentNumber} ${tagInfo.name} の直後`;
+
+					insertionPointSelector.appendChild(option);
+				});
+
+				const optionEnd = document.createElement("option");
+				optionEnd.value = "end";
+				optionEnd.textContent = `リストの末尾 (#${allGroups.length + 1} として追加)`;
+				insertionPointSelector.appendChild(optionEnd);
+
+				if (
+					selectedValue &&
+					Array.from(insertionPointSelector.options).some((opt) => opt.value === selectedValue)
+				) {
+					insertionPointSelector.value = selectedValue;
+				} else {
+					insertionPointSelector.value = allGroups.length === 0 ? "start" : "end";
+				}
+			};
+
+			// テキストエリアを作成し、選択された位置に挿入する関数 (引数を変更)
+			const createTextarea = (tagId, tagType, tagName) => {
+				areaIndex++;
+				const groupDiv = document.createElement("div");
+				groupDiv.className = "input-area-group";
+				groupDiv.id = `area-group-${areaIndex}`;
+
+				const tagLabel = document.createElement("span");
+				tagLabel.className = "input-label-tag";
+
+				const numberPrefix = document.createElement("span");
+				numberPrefix.className = "number-prefix";
+				tagLabel.appendChild(numberPrefix);
+
+				const tagTextSpan = document.createElement("span");
+				tagTextSpan.textContent = tagName;
+				tagLabel.appendChild(tagTextSpan);
+
+				const newTextarea = document.createElement("textarea");
+				newTextarea.className = `input-text-area input-${tagId}-area`;
+				newTextarea.id = `text-area-${tagId}-${areaIndex}`;
+				newTextarea.setAttribute("data-tag-id", tagId); // タグIDをデータ属性として保持
+
+				newTextarea.rows = 3;
+				newTextarea.cols = 50;
+				newTextarea.style.resize = "vertical";
+
+				let placeholderText = `${tagName}タグ用のテキストエリア`;
+
+				if (tagType === "link") {
+					placeholderText = `${tagName}エリア。1行目: 表示テキスト、2行目: リンクURL`;
+				} else if (tagType === "p-list") {
+					placeholderText = `${tagName}エリア。1行目: Pタグの内容、2行目以降: リスト項目`;
+				} else if (tagType === "single") {
+					placeholderText = `${tagName}エリア。テキストを入力してください。改行は<br>になります。`;
+				} else if (tagType === "list") {
+					placeholderText = `${tagName}エリア。各行がliタグに変換されます。`;
+				}
+				newTextarea.placeholder = placeholderText;
+
+				const deleteButton = document.createElement("button");
+				deleteButton.textContent = "削除";
+				deleteButton.className = "delete-input-button";
+
+				deleteButton.addEventListener("click", () => {
+					groupDiv.remove();
+					updateInsertionPoints();
+				});
+
+				groupDiv.appendChild(tagLabel);
+				groupDiv.appendChild(newTextarea);
+				groupDiv.appendChild(deleteButton);
+
+				const insertPoint = insertionPointSelector.value;
+
+				if (insertPoint === "start") {
+					container.prepend(groupDiv);
+				} else if (insertPoint === "end") {
+					container.appendChild(groupDiv);
+				} else {
+					const selectedElement = document.getElementById(insertPoint);
+					if (selectedElement) {
+						container.insertBefore(groupDiv, selectedElement.nextElementSibling);
+					} else {
+						container.appendChild(groupDiv);
+					}
+				}
+
+				updateInsertionPoints();
+				insertionPointSelector.value = groupDiv.id;
+			};
+
+			// --- ページ初期化 ---
+			loadAllPatterns();
+			rebuildTagButtonList(); // タグボタン管理一覧を初期表示
+
+			// --- その他の機能 (変更なし) ---
+
+			// 選択範囲をタグで囲むコア関数 (変更なし)
+			window.wrapSelectionWithTag = (tagName) => {
+				const textarea = document.activeElement;
+				if (
+					!textarea ||
+					textarea.tagName !== "TEXTAREA" ||
+					!textarea.classList.contains("input-text-area")
+				) {
+					return;
+				}
+				const start = textarea.selectionStart;
+				const end = textarea.selectionEnd;
+				const selectedText = textarea.value.substring(start, end);
+				if (selectedText.length === 0) {
+					return;
+				}
+
+				let openTag;
+				let closeTag;
+
+				if (tagName === "a") {
+					openTag = `<a href="">`;
+					closeTag = `</a>`;
+				} else {
+					openTag = `<${tagName}>`;
+					closeTag = `</${tagName}>`;
+				}
+
+				const newText =
+					textarea.value.substring(0, start) +
+					openTag +
+					selectedText +
+					closeTag +
+					textarea.value.substring(end);
+
+				textarea.value = newText;
+
+				let newCursorPos;
+				if (tagName === "a") {
+					// カーソルを href="" のダブルクォートの内側 (a href="|") に設定
+					newCursorPos = start + openTag.length - 1;
+				} else {
+					newCursorPos = start + openTag.length + selectedText.length + closeTag.length;
+				}
+
+				textarea.selectionStart = newCursorPos;
+				textarea.selectionEnd = newCursorPos;
+				textarea.focus();
+			};
+
+			// キーボードショートカットイベントリスナー (変更なし)
+			document.addEventListener("keydown", function (event) {
+				const isModifierKey = event.ctrlKey || event.metaKey;
+				if (isModifierKey) {
+					const key = event.key.toUpperCase();
+					let tagName = null;
+					if (key === "B") {
+						tagName = "strong";
+					} else if (key === "M") {
+						tagName = "mark";
+					} else if (key === "U") {
+						tagName = "sup";
+					} else if (key === "L") {
+						tagName = "li";
+					} else if (key === "K") {
+						tagName = "a";
+					}
+
+					if (tagName) {
+						event.preventDefault();
+						window.wrapSelectionWithTag(tagName);
+					}
+				}
+			});
+
+			// 出力エリアクリア機能 (変更なし)
+			if (clearOutputButton) {
+				clearOutputButton.addEventListener("click", function () {
+					htmlCodeOutput.textContent = "";
+				});
+			}
+
+			// コードコピー機能 (変更なし)
+			if (copyOutputButton) {
+				copyOutputButton.addEventListener("click", async function () {
+					const textToCopy = htmlCodeOutput.textContent;
+					if (textToCopy.trim().length === 0) {
+						// alert("コピーするHTMLコードがありません。");
+						console.warn("コピーするHTMLコードがありません。");
+						return;
+					}
+
+					try {
+						await navigator.clipboard.writeText(textToCopy);
+						const originalText = copyOutputButton.textContent;
+						copyOutputButton.textContent = "コピーしました！";
+						setTimeout(() => {
+							copyOutputButton.textContent = originalText;
+						}, 1500);
+					} catch (err) {
+						console.error("クリップボードへの書き込みに失敗しました:", err);
+						// navigator.clipboard が使えない環境（httpなど）のためのフォールバック
+						try {
+							const tempTextarea = document.createElement("textarea");
+							tempTextarea.value = textToCopy;
+							document.body.appendChild(tempTextarea);
+							tempTextarea.select();
+							document.execCommand("copy");
+							document.body.removeChild(tempTextarea);
+
+							const originalText = copyOutputButton.textContent;
+							copyOutputButton.textContent = "コピーしました！(FB)";
+							setTimeout(() => {
+								copyOutputButton.textContent = originalText;
+							}, 1500);
+						} catch (copyErr) {
+							console.error("フォールバックコピーにも失敗しました:", copyErr);
+							// alert は使用しない
+						}
+					}
+				});
+			}
+
+			// 【修正】一括変換機能
+			if (convertAllButton) {
+				convertAllButton.addEventListener("click", function () {
+					// 変換直前に設定を保存し、最新のテンプレートを取得できるように保証します
+					saveAllPatterns();
+
+					const allTextareas = document.querySelectorAll(".input-text-area");
+					let outputHtmlString = "";
+
+					if (allTextareas.length === 0) {
+						outputHtmlString = "<!-- 警告: 入力されたテキストエリアがありません -->\n";
+					} else {
+						allTextareas.forEach((textarea) => {
+							outputHtmlString += convertTextToHtmlString(textarea);
+						});
+					}
+
+					// 新しい内容が空でなければ追記
+					if (outputHtmlString.trim().length > 0) {
+						const existingContent = htmlCodeOutput.textContent.trim();
+						if (existingContent.length > 0) {
+							htmlCodeOutput.textContent += "\n"; // 既存の内容があれば改行を追加
+						}
+						// 末尾の不要な改行を削除して追記
+						htmlCodeOutput.textContent += outputHtmlString.trimEnd();
+					}
+				});
+			}
+		});
+	</script>
+</html>
