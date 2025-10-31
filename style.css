@@ -1,0 +1,310 @@
+/* サイト全体の幅を1200pxに固定し、中央寄せにする */
+body {
+	max-width: 1200px;
+	margin: 0 auto;
+	padding: 20px;
+	box-sizing: border-box;
+	font-family: sans-serif;
+	font-size: 16px;
+}
+
+/* 変換パターン設定エリアのスタイル */
+
+.pattern-selector {
+	margin-bottom: 10px;
+}
+
+/* パターン管理コントロールのスタイル */
+#patternManagement {
+	border: 1px solid #ccc;
+	padding: 10px;
+	margin-top: 15px;
+	margin-bottom: 10px;
+	background-color: #f9f9f9;
+	display: flex;
+	gap: 10px;
+	align-items: center;
+}
+#patternManagement button {
+	padding: 8px 12px;
+	font-size: 0.9em;
+	min-height: 36px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.pattern-selector label {
+	display: inline-block;
+	margin-right: 20px;
+	font-weight: bold;
+}
+/* 入力エリアのグループスタイル（高さ統一） */
+.input-area-group {
+	display: flex;
+	align-items: stretch;
+	margin-bottom: 10px;
+}
+.input-area-group textarea {
+	flex-grow: 1;
+	width: 100%;
+	min-width: 0;
+	padding: 8px;
+	border: 1px solid #ccc;
+	border-radius: 4px;
+	font-family: inherit;
+	font-size: 1em;
+	box-sizing: border-box;
+}
+.input-area-group button {
+	flex-shrink: 0;
+	margin-left: 10px;
+	padding: 5px 15px;
+	align-self: flex-start;
+}
+
+/* タグ種別ラベルのスタイル */
+.input-label-tag {
+	flex-shrink: 0;
+	width: 120px;
+	padding: 8px;
+	margin-right: 10px;
+	background-color: #f4f4f4;
+	border: 1px solid #ccc;
+	color: #333;
+	font-size: 1em;
+	font-weight: normal;
+	text-align: center;
+	align-self: stretch;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	white-space: pre-wrap;
+	flex-direction: column;
+	line-height: 1.3;
+}
+
+/* ナンバー部分のスタイルを標準サイズ (1em)・太字解除 (normal) に設定 */
+.input-label-tag .number-prefix {
+	font-size: 1em;
+	font-weight: normal;
+	margin-bottom: 4px;
+}
+
+/* 挿入位置セレクタのスタイル */
+#insertionPointControls {
+	margin-top: 15px;
+	margin-bottom: 15px;
+	padding: 10px;
+	border: 1px solid #eee;
+	background-color: #f9f9f9;
+}
+#insertionPointControls label {
+	font-weight: bold;
+	margin-right: 10px;
+}
+#insertionPointSelector {
+	padding: 5px;
+	border: 1px solid #ccc;
+	border-radius: 4px;
+	min-width: 300px;
+}
+/* タグ追加ボタン群 */
+.tag-buttons button {
+	margin-right: 10px;
+	margin-bottom: 5px;
+}
+
+/* --- タグ管理エリア --- */
+#tagButtonManagement {
+	border: 1px solid #ccc;
+	padding: 10px;
+	margin-bottom: 15px;
+	background-color: #f5f5f5;
+}
+#tagButtonList {
+	max-height: 200px;
+	overflow-y: auto;
+	margin-top: 10px;
+	padding: 5px;
+	border: 1px solid #ddd;
+	background-color: white;
+}
+/* --- ショートカット管理エリア --- */
+#shortcutManagement {
+	border: 1px solid #ccc;
+	padding: 10px;
+	margin-bottom: 15px;
+	background-color: #f5f5f5;
+}
+#shortcutManagement button {
+	margin-bottom: 10px;
+}
+#shortcutList {
+	max-height: 300px;
+	overflow-y: auto;
+	margin-top: 10px;
+	padding: 5px;
+	border: 1px solid #ddd;
+	background-color: white;
+}
+.shortcut-item {
+	display: flex;
+	align-items: center;
+	padding: 5px;
+	border-bottom: 1px dotted #eee;
+}
+.shortcut-item:last-child {
+	border-bottom: none;
+}
+.shortcut-item label {
+	flex-shrink: 0;
+	width: 100px;
+	font-weight: bold;
+	font-size: 0.9em;
+	margin-right: 8px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.shortcut-item select,
+.shortcut-item input[type="text"] {
+	flex-grow: 1;
+	padding: 5px;
+	border: 1px solid #ccc;
+	border-radius: 4px;
+	font-size: 1em;
+}
+.shortcut-item button {
+	flex-shrink: 0;
+	margin-left: 8px;
+	padding: 5px 8px;
+	font-size: 0.85em;
+}
+/* モバイル対応 */
+@media (max-width: 768px) {
+	body {
+		padding: 10px;
+		font-size: 14px;
+	}
+	.shortcut-item {
+		padding: 5px;
+	}
+	.shortcut-item label {
+		width: 70px;
+		font-size: 0.75em;
+		margin-right: 4px;
+		line-height: 1.2;
+	}
+	.shortcut-item input[type="text"] {
+		padding: 4px;
+		font-size: 0.85em;
+		min-width: 0;
+	}
+	.shortcut-item button {
+		margin-left: 4px;
+		padding: 4px 6px;
+		font-size: 0.75em;
+	}
+	#shortcutManagement {
+		padding: 8px;
+	}
+}
+.tag-item {
+	display: flex;
+	align-items: center;
+	padding: 5px;
+	border-bottom: 1px dotted #eee;
+}
+.tag-item:last-child {
+	border-bottom: none;
+}
+.tag-item span {
+	flex-grow: 1;
+	margin-right: 10px;
+	font-family: monospace;
+}
+.tag-item button {
+	margin-left: 5px;
+}
+/* モーダル */
+.modal {
+	display: none;
+	position: fixed;
+	z-index: 1000;
+	left: 0;
+	top: 0;
+	width: 100%;
+	height: 100%;
+	overflow: auto;
+	background-color: rgba(0, 0, 0, 0.4);
+}
+.modal-content {
+	background-color: #fefefe;
+	margin: 10% auto;
+	padding: 20px;
+	border: 1px solid #888;
+	width: 80%;
+	max-width: 500px;
+	border-radius: 8px;
+	position: relative;
+}
+.close {
+	color: #aaa;
+	float: right;
+	font-size: 28px;
+	font-weight: bold;
+}
+.close:hover,
+.close:focus {
+	color: #000;
+	text-decoration: none;
+	cursor: pointer;
+}
+#tagModalForm label,
+#shortcutModalForm label {
+	display: block;
+	margin-top: 10px;
+	font-weight: bold;
+}
+#tagModalForm input[type="text"],
+#tagModalForm select,
+#tagModalForm textarea,
+#shortcutModalForm input[type="text"] {
+	width: 95%;
+	padding: 8px;
+	margin: 5px 0 15px 0;
+	display: inline-block;
+	border: 1px solid #ccc;
+	border-radius: 4px;
+	box-sizing: border-box;
+}
+#shortcutModalForm button[type="submit"] {
+	margin-top: 10px;
+}
+#shortcutModalForm p {
+	margin-top: 0;
+	margin-bottom: 15px;
+	line-height: 1.4;
+}
+
+/* 出力エリアのスタイル */
+#outputContainer {
+	margin-top: 20px;
+}
+#outputContainer pre {
+	background-color: #f5f5f5;
+	border: 1px solid #ddd;
+	border-radius: 4px;
+	padding: 15px;
+	max-width: 100%;
+	overflow-x: auto;
+	white-space: pre-wrap;
+	word-wrap: break-word;
+	word-break: break-all;
+}
+#outputContainer code {
+	font-family: "Courier New", Courier, monospace;
+	font-size: 0.9em;
+	line-height: 1.5;
+}
