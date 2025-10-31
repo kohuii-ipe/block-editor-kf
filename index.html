@@ -150,8 +150,7 @@
 			.shortcut-item {
 				display: flex;
 				align-items: center;
-				padding: 8px;
-				margin-bottom: 5px;
+				padding: 5px;
 				border-bottom: 1px dotted #eee;
 			}
 			.shortcut-item:last-child {
@@ -312,7 +311,7 @@
 				word-break: break-all;
 			}
 			#outputContainer code {
-				font-family: 'Courier New', Courier, monospace;
+				font-family: "Courier New", Courier, monospace;
 				font-size: 0.9em;
 				line-height: 1.5;
 			}
@@ -418,27 +417,23 @@
 						<option value="list">[TEXT]置換 (UL, OLなど。各行がLIに)</option>
 						<option value="link">[TEXT]と[URL]置換 (リンク系。2行入力)</option>
 						<option value="p-list">[TEXT_P]と[TEXT_LIST]置換 (P+UL/OL系。複数行入力)</option>
-						<option value="link-list">[TEXT]と[URL]で繰り返し (複数リンクのリスト。交互に入力)</option>
+						<option value="link-list">
+							[TEXT]と[URL]で繰り返し (複数リンクのリスト。交互に入力)
+						</option>
 					</select>
 					<p style="font-size: 0.8em; color: #666; margin-top: -10px">
 						※入力エリアの動作（複数行の扱い、URLの取得など）を決定します。
 					</p>
 
 					<label for="tagTemplateInput">雛形 (テンプレート)</label>
-					<textarea
-						id="tagTemplateInput"
-						rows="3"
-						placeholder='例: &lt;p class="custom"&gt;[TEXT]&lt;/p&gt;'></textarea>
+					<textarea id="tagTemplateInput" rows="3" placeholder='例: &lt;p class="custom"&gt;[TEXT]&lt;/p&gt;'></textarea>
 					<p style="font-size: 0.8em; color: #666; margin-top: -10px">
 						※タグタイプに合わせて、[TEXT], [URL], [TEXT_P], [TEXT_LIST], [LINK_LIST] を使用できます。
 					</p>
 
-					<div id="linkItemTemplateSection" style="display: none;">
+					<div id="linkItemTemplateSection" style="display: none">
 						<label for="linkItemTemplateInput">リンク項目の雛形 (link-list用)</label>
-						<textarea
-							id="linkItemTemplateInput"
-							rows="2"
-							placeholder='例: &lt;li class="rtoc-item"&gt;&lt;a href="[URL]"&gt;[TEXT]&lt;/a&gt;&lt;/li&gt;'></textarea>
+						<textarea id="linkItemTemplateInput" rows="2" placeholder='例: &lt;li class="rtoc-item"&gt;&lt;a href="[URL]"&gt;[TEXT]&lt;/a&gt;&lt;/li&gt;'></textarea>
 						<p style="font-size: 0.8em; color: #666; margin-top: -10px">
 							※繰り返される各リンク項目の形式を [URL] と [TEXT] を使って定義します。
 						</p>
@@ -457,13 +452,13 @@
 				<form id="shortcutModalForm">
 					<label for="shortcutKeyInput">キー (A-Z の1文字)</label>
 					<input type="text" id="shortcutKeyInput" maxlength="1" required placeholder="例: G, I, Pなど" />
-					<p style="font-size: 0.85em; color: #666;">
-						※Ctrl/Cmd (⌃) と組み合わせて使用します。A-Zの英字1文字を入力してください。
+					<p style="font-size: 0.85em; color: #666">
+						※Ctrl/Cmd と組み合わせて使用します。A-Zの英字1文字を入力してください。
 					</p>
 
 					<label for="shortcutTagInput">タグ名</label>
 					<input type="text" id="shortcutTagInput" required placeholder="例: code, span, div" />
-					<p style="font-size: 0.85em; color: #666;">
+					<p style="font-size: 0.85em; color: #666">
 						※選択テキストを囲むHTMLタグ名を入力してください。
 					</p>
 
@@ -546,6 +541,13 @@
 				pattern1: {
 					name: "ソニー (デフォルト)",
 					buttons: JSON.parse(JSON.stringify(defaultTagButtons)), // ディープコピー
+					shortcuts: {
+						B: { tag: "strong", displayName: "Ctrl/Cmd+B" },
+						M: { tag: "mark", displayName: "Ctrl/Cmd+M" },
+						U: { tag: "sup", displayName: "Ctrl/Cmd+U" },
+						L: { tag: "li", displayName: "Ctrl/Cmd+L" },
+						K: { tag: "a", displayName: "Ctrl/Cmd+K" },
+					},
 				},
 				pattern2: {
 					name: "カスタム例",
@@ -570,6 +572,13 @@
 							tagType: "single",
 						},
 					],
+					shortcuts: {
+						B: { tag: "strong", displayName: "Ctrl/Cmd+B" },
+						M: { tag: "mark", displayName: "Ctrl/Cmd+M" },
+						U: { tag: "sup", displayName: "Ctrl/Cmd+U" },
+						L: { tag: "li", displayName: "Ctrl/Cmd+L" },
+						K: { tag: "a", displayName: "Ctrl/Cmd+K" },
+					},
 				},
 			};
 
@@ -582,11 +591,11 @@
 
 			// デフォルトのショートカット設定
 			const defaultShortcuts = {
-				B: { tag: "strong", displayName: "⌃B" },
-				M: { tag: "mark", displayName: "⌃M" },
-				U: { tag: "sup", displayName: "⌃U" },
-				L: { tag: "li", displayName: "⌃L" },
-				K: { tag: "a", displayName: "⌃K" },
+				B: { tag: "strong", displayName: "Ctrl/Cmd+B" },
+				M: { tag: "mark", displayName: "Ctrl/Cmd+M" },
+				U: { tag: "sup", displayName: "Ctrl/Cmd+U" },
+				L: { tag: "li", displayName: "Ctrl/Cmd+L" },
+				K: { tag: "a", displayName: "Ctrl/Cmd+K" },
 			};
 
 			let keyboardShortcuts = {};
@@ -603,19 +612,27 @@
 			};
 
 			const saveShortcuts = () => {
-				localStorage.setItem(SHORTCUTS_KEY, JSON.stringify(keyboardShortcuts));
+				const patternId = getSelectedPatternId();
+				const currentPattern = patterns[patternId];
+
+				if (currentPattern) {
+					currentPattern.shortcuts = keyboardShortcuts;
+					saveAllPatterns(); // パターン全体を保存
+				}
 			};
 
 			const loadShortcuts = () => {
-				const savedShortcuts = localStorage.getItem(SHORTCUTS_KEY);
-				if (savedShortcuts) {
-					try {
-						keyboardShortcuts = JSON.parse(savedShortcuts);
-					} catch (e) {
-						keyboardShortcuts = JSON.parse(JSON.stringify(defaultShortcuts));
-					}
+				const patternId = getSelectedPatternId();
+				const currentPattern = patterns[patternId];
+
+				if (currentPattern && currentPattern.shortcuts) {
+					keyboardShortcuts = currentPattern.shortcuts;
 				} else {
+					// フォールバック：パターンにショートカットがない場合はデフォルトを設定
 					keyboardShortcuts = JSON.parse(JSON.stringify(defaultShortcuts));
+					if (currentPattern) {
+						currentPattern.shortcuts = keyboardShortcuts;
+					}
 				}
 			};
 
@@ -648,8 +665,7 @@
 					deleteButton.textContent = "削除";
 					deleteButton.style.color = "red";
 					deleteButton.addEventListener("click", () => {
-						if (true) {
-							// TODO: カスタム確認モーダル推奨
+						if (confirm(`ショートカット「${shortcut.displayName}」を削除してもよろしいですか？`)) {
 							console.log(`ショートカット「${shortcut.displayName}」を削除しました。`);
 							delete keyboardShortcuts[key];
 							buildShortcutUI();
@@ -688,6 +704,10 @@
 									}
 								}
 							});
+							// 後方互換性：ショートカットがない古いパターンにデフォルトショートカットを追加
+							if (!patterns[id].shortcuts) {
+								patterns[id].shortcuts = JSON.parse(JSON.stringify(defaultShortcuts));
+							}
 						});
 					} catch (e) {
 						patterns = defaultPatterns;
@@ -738,6 +758,8 @@
 					input.addEventListener("change", () => {
 						rebuildTagButtons(); // パターン切り替え時、ボタンを再生成
 						rebuildTagButtonList(); // タグボタン管理一覧を更新
+						loadShortcuts(); // ショートカットを再読み込み
+						buildShortcutUI(); // ショートカットUIを再構築
 						saveAllPatterns();
 					});
 
@@ -777,8 +799,7 @@
 
 				// ★★★ 修正箇所 ★★★
 				// 既存のパターンのボタン定義をディープコピー（テンプレートもそのままコピー）
-				const sourcePattern =
-					patterns[getSelectedPatternId()] || patterns[Object.keys(patterns)[0]];
+				const sourcePattern = patterns[getSelectedPatternId()] || patterns[Object.keys(patterns)[0]];
 
 				patterns[newId] = {
 					name: newName,
@@ -794,11 +815,15 @@
 							}))
 						)
 					),
+					// ショートカットもコピー
+					shortcuts: JSON.parse(JSON.stringify(sourcePattern.shortcuts || defaultShortcuts)),
 				};
 
 				rebuildPatternUI(newId);
 				rebuildTagButtons();
 				rebuildTagButtonList();
+				loadShortcuts(); // 新しいパターンのショートカットを読み込み
+				buildShortcutUI(); // ショートカットUIを再構築
 				saveAllPatterns();
 			});
 
@@ -825,10 +850,7 @@
 				}
 
 				const currentPattern = patterns[selectedId];
-				// confirm の代わりに true で続行 (Canvas環境ではconfirmが機能しないため)
-				// if (confirm(`パターン「${currentPattern.name}」を削除してもよろしいですか？`)) {
-				if (true) {
-					// TODO: 本番環境ではカスタムモーダルでの確認を推奨
+				if (confirm(`パターン「${currentPattern.name}」を削除してもよろしいですか？`)) {
 					console.log(`パターン「${currentPattern.name}」を削除しました。`);
 					delete patterns[selectedId];
 
@@ -836,6 +858,8 @@
 					rebuildPatternUI(firstId);
 					rebuildTagButtons();
 					rebuildTagButtonList();
+					loadShortcuts(); // 新しいパターンのショートカットを読み込み
+					buildShortcutUI(); // ショートカットUIを再構築
 					saveAllPatterns();
 				}
 			});
@@ -917,7 +941,7 @@
 
 				// 既存のショートカットがある場合は上書き確認
 				if (keyboardShortcuts[key]) {
-					if (!confirm(`⌃${key} は既に使用されています。上書きしますか？`)) {
+					if (!confirm(`Ctrl/Cmd+${key} は既に使用されています。上書きしますか？`)) {
 						return;
 					}
 				}
@@ -925,7 +949,7 @@
 				// ショートカットを追加
 				keyboardShortcuts[key] = {
 					tag: tag,
-					displayName: `⌃${key}`,
+					displayName: `Ctrl/Cmd+${key}`,
 				};
 
 				shortcutModal.style.display = "none";
@@ -1042,9 +1066,7 @@
 					deleteButton.textContent = "削除";
 					deleteButton.style.color = "red";
 					deleteButton.addEventListener("click", () => {
-						// if (confirm(`タグ「${button.name}」を削除してもよろしいですか？`)) {
-						if (true) {
-							// TODO: カスタム確認モーダル推奨
+						if (confirm(`タグ「${button.name}」を削除してもよろしいですか？`)) {
 							console.log(`タグ「${button.name}」を削除しました。`);
 							currentPattern.buttons = currentPattern.buttons.filter((b) => b.id !== button.id);
 							rebuildTagButtons();
@@ -1120,10 +1142,7 @@
 
 				if (tagType === "link") {
 					// リンクタグ系の特別処理 (link)
-					const lines = text
-						.trim()
-						.split("\n")
-						.map((line) => line.trim());
+					const lines = text.trim().split("\n").map((line) => line.trim());
 					const linkText = lines[0] || "リンク";
 					const url = lines[1] || "";
 
@@ -1145,20 +1164,15 @@
 						listContent = `<li>リスト項目がありません</li>`;
 					}
 
-					output = templateString
-						.replace(/\[TEXT_P\]/g, pText)
-						.replace(/\[TEXT_LIST\]/g, listContent);
+					output = templateString.replace(/\[TEXT_P\]/g, pText).replace(/\[TEXT_LIST\]/g, listContent);
 				} else if (tagType === "list") {
 					// リストタグの処理 (list)
-					let listContent = text
-						.trim()
-						.split("\n")
+					let listContent = text.trim().split("\n")
 						.filter((line) => line.trim() !== "")
 						.map((line) => {
 							// すでにliタグが含まれていたらそのまま、そうでなければliタグで囲む
 							return line.match(/^\s*<li/i) ? line : `<li>${line.trim()}</li>`;
-						})
-						.join("\n");
+						}).join("\n");
 
 					if (listContent.trim() === "") listContent = `<li>リスト項目がありません</li>`;
 
@@ -1182,9 +1196,7 @@
 
 						if (linkText && linkUrl) {
 							// カスタムテンプレートを使用して変換
-							const itemHtml = linkItemTemplate
-								.replace(/\[TEXT\]/g, linkText)
-								.replace(/\[URL\]/g, linkUrl);
+							const itemHtml = linkItemTemplate.replace(/\[TEXT\]/g, linkText).replace(/\[URL\]/g, linkUrl);
 							linkListContent += itemHtml + "\n";
 						} else if (linkText) {
 							// URLがない場合は警告
@@ -1239,10 +1251,7 @@
 				optionEnd.textContent = `リストの末尾 (#${allGroups.length + 1} として追加)`;
 				insertionPointSelector.appendChild(optionEnd);
 
-				if (
-					selectedValue &&
-					Array.from(insertionPointSelector.options).some((opt) => opt.value === selectedValue)
-				) {
+				if (selectedValue && Array.from(insertionPointSelector.options).some((opt) => opt.value === selectedValue)) {
 					insertionPointSelector.value = selectedValue;
 				} else {
 					insertionPointSelector.value = allGroups.length === 0 ? "start" : "end";
@@ -1334,11 +1343,7 @@
 			// 選択範囲をタグで囲むコア関数 (変更なし)
 			window.wrapSelectionWithTag = (tagName) => {
 				const textarea = document.activeElement;
-				if (
-					!textarea ||
-					textarea.tagName !== "TEXTAREA" ||
-					!textarea.classList.contains("input-text-area")
-				) {
+				if (!textarea || textarea.tagName !== "TEXTAREA" || !textarea.classList.contains("input-text-area")) {
 					return;
 				}
 				const start = textarea.selectionStart;
@@ -1359,12 +1364,7 @@
 					closeTag = `</${tagName}>`;
 				}
 
-				const newText =
-					textarea.value.substring(0, start) +
-					openTag +
-					selectedText +
-					closeTag +
-					textarea.value.substring(end);
+				const newText = textarea.value.substring(0, start) + openTag + selectedText + closeTag + textarea.value.substring(end);
 
 				textarea.value = newText;
 
