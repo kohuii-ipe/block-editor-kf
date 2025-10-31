@@ -150,8 +150,12 @@
 			.shortcut-item {
 				display: flex;
 				align-items: center;
+<<<<<<< HEAD
+				padding: 5px;
+=======
 				padding: 8px;
 				margin-bottom: 5px;
+>>>>>>> 5aa15c27d6e94bdb5a93affd85868566afc16704
 				border-bottom: 1px dotted #eee;
 			}
 			.shortcut-item:last-child {
@@ -542,6 +546,13 @@
 				pattern1: {
 					name: "ソニー (デフォルト)",
 					buttons: JSON.parse(JSON.stringify(defaultTagButtons)), // ディープコピー
+					shortcuts: {
+						B: { tag: "strong", displayName: "Ctrl/Cmd+B" },
+						M: { tag: "mark", displayName: "Ctrl/Cmd+M" },
+						U: { tag: "sup", displayName: "Ctrl/Cmd+U" },
+						L: { tag: "li", displayName: "Ctrl/Cmd+L" },
+						K: { tag: "a", displayName: "Ctrl/Cmd+K" },
+					},
 				},
 				pattern2: {
 					name: "カスタム例",
@@ -566,6 +577,13 @@
 							tagType: "single",
 						},
 					],
+					shortcuts: {
+						B: { tag: "strong", displayName: "Ctrl/Cmd+B" },
+						M: { tag: "mark", displayName: "Ctrl/Cmd+M" },
+						U: { tag: "sup", displayName: "Ctrl/Cmd+U" },
+						L: { tag: "li", displayName: "Ctrl/Cmd+L" },
+						K: { tag: "a", displayName: "Ctrl/Cmd+K" },
+					},
 				},
 			};
 
@@ -599,6 +617,29 @@
 			};
 
 			const saveShortcuts = () => {
+<<<<<<< HEAD
+				const patternId = getSelectedPatternId();
+				const currentPattern = patterns[patternId];
+
+				if (currentPattern) {
+					currentPattern.shortcuts = keyboardShortcuts;
+					saveAllPatterns(); // パターン全体を保存
+				}
+			};
+
+			const loadShortcuts = () => {
+				const patternId = getSelectedPatternId();
+				const currentPattern = patterns[patternId];
+
+				if (currentPattern && currentPattern.shortcuts) {
+					keyboardShortcuts = currentPattern.shortcuts;
+				} else {
+					// フォールバック：パターンにショートカットがない場合はデフォルトを設定
+					keyboardShortcuts = JSON.parse(JSON.stringify(defaultShortcuts));
+					if (currentPattern) {
+						currentPattern.shortcuts = keyboardShortcuts;
+					}
+=======
 				localStorage.setItem(SHORTCUTS_KEY, JSON.stringify(keyboardShortcuts));
 			};
 
@@ -612,6 +653,7 @@
 					}
 				} else {
 					keyboardShortcuts = JSON.parse(JSON.stringify(defaultShortcuts));
+>>>>>>> 5aa15c27d6e94bdb5a93affd85868566afc16704
 				}
 			};
 
@@ -644,8 +686,12 @@
 					deleteButton.textContent = "削除";
 					deleteButton.style.color = "red";
 					deleteButton.addEventListener("click", () => {
+<<<<<<< HEAD
+						if (confirm(`ショートカット「${shortcut.displayName}」を削除してもよろしいですか？`)) {
+=======
 						if (true) {
 							// TODO: カスタム確認モーダル推奨
+>>>>>>> 5aa15c27d6e94bdb5a93affd85868566afc16704
 							console.log(`ショートカット「${shortcut.displayName}」を削除しました。`);
 							delete keyboardShortcuts[key];
 							buildShortcutUI();
@@ -684,6 +730,10 @@
 									}
 								}
 							});
+							// 後方互換性：ショートカットがない古いパターンにデフォルトショートカットを追加
+							if (!patterns[id].shortcuts) {
+								patterns[id].shortcuts = JSON.parse(JSON.stringify(defaultShortcuts));
+							}
 						});
 					} catch (e) {
 						patterns = defaultPatterns;
@@ -734,6 +784,8 @@
 					input.addEventListener("change", () => {
 						rebuildTagButtons(); // パターン切り替え時、ボタンを再生成
 						rebuildTagButtonList(); // タグボタン管理一覧を更新
+						loadShortcuts(); // ショートカットを再読み込み
+						buildShortcutUI(); // ショートカットUIを再構築
 						saveAllPatterns();
 					});
 
@@ -789,11 +841,15 @@
 							}))
 						)
 					),
+					// ショートカットもコピー
+					shortcuts: JSON.parse(JSON.stringify(sourcePattern.shortcuts || defaultShortcuts)),
 				};
 
 				rebuildPatternUI(newId);
 				rebuildTagButtons();
 				rebuildTagButtonList();
+				loadShortcuts(); // 新しいパターンのショートカットを読み込み
+				buildShortcutUI(); // ショートカットUIを再構築
 				saveAllPatterns();
 			});
 
@@ -820,10 +876,7 @@
 				}
 
 				const currentPattern = patterns[selectedId];
-				// confirm の代わりに true で続行 (Canvas環境ではconfirmが機能しないため)
-				// if (confirm(`パターン「${currentPattern.name}」を削除してもよろしいですか？`)) {
-				if (true) {
-					// TODO: 本番環境ではカスタムモーダルでの確認を推奨
+				if (confirm(`パターン「${currentPattern.name}」を削除してもよろしいですか？`)) {
 					console.log(`パターン「${currentPattern.name}」を削除しました。`);
 					delete patterns[selectedId];
 
@@ -831,6 +884,8 @@
 					rebuildPatternUI(firstId);
 					rebuildTagButtons();
 					rebuildTagButtonList();
+					loadShortcuts(); // 新しいパターンのショートカットを読み込み
+					buildShortcutUI(); // ショートカットUIを再構築
 					saveAllPatterns();
 				}
 			});
@@ -1037,9 +1092,7 @@
 					deleteButton.textContent = "削除";
 					deleteButton.style.color = "red";
 					deleteButton.addEventListener("click", () => {
-						// if (confirm(`タグ「${button.name}」を削除してもよろしいですか？`)) {
-						if (true) {
-							// TODO: カスタム確認モーダル推奨
+						if (confirm(`タグ「${button.name}」を削除してもよろしいですか？`)) {
 							console.log(`タグ「${button.name}」を削除しました。`);
 							currentPattern.buttons = currentPattern.buttons.filter((b) => b.id !== button.id);
 							rebuildTagButtons();
