@@ -62,7 +62,7 @@ document.addEventListener("DOMContentLoaded", function () {
 		{
 			id: "box-p-ul",
 			name: "箇条書きリスト",
-			template: '<div class="box"><p>[TEXT_P]</p><ul>\n[TEXT_LIST]\n</ul></div>',
+			template: '<div class="box"><p>[TEXT_P_1]</p><p>[TEXT_P_2]</p><ul>\n[TEXT_LIST]\n</ul></div>',
 			tagType: "p-list",
 		},
 	];
@@ -512,7 +512,7 @@ document.addEventListener("DOMContentLoaded", function () {
 				placeholder = '例: <a href="[URL]">[TEXT]</a>';
 				break;
 			case "p-list":
-				placeholder = "例:\n<div>\n<p>[TEXT_P]</p>\n<ul>\n[TEXT_LIST]\n</ul>\n</div>";
+				placeholder = "例:\n<div>\n<p>[TEXT_P_1]</p>\n<p>[TEXT_P_2]</p>\n<ul>\n[TEXT_LIST]\n</ul>\n</div>\n\n※[TEXT_P_1], [TEXT_P_2]...で複数段落、[TEXT_LIST]でリスト項目を配置";
 				break;
 			case "link-list":
 				placeholder = '例:\n<div class="wrapper">\n<ul>\n[LINK_LIST]\n</ul>\n</div>\n\n※[LINK_LIST]の位置に繰り返されるリンク項目が挿入されます';
@@ -682,19 +682,59 @@ document.addEventListener("DOMContentLoaded", function () {
 				output = `<!-- 警告: リンクエリアですがURLが2行目に指定されていません (${linkText}) -->\n`;
 			}
 		} else if (tagType === "p-list") {
-			// P+リストタグの処理 (p-list)
+			// P+リストタグの処理 (p-list) - 複数段落対応版
 			const lines = text.trim().split("\n");
-			const pText = lines[0] ? lines[0].trim().replace(/\n/g, "<br>") : "リストのタイトル";
-			const listLines = lines.slice(1).filter((line) => line.trim() !== "");
+			const paragraphLines = [];
+			const listLines = [];
 
+			// 行を段落とリストに分類
+			lines.forEach(line => {
+				const trimmedLine = line.trim();
+				if (trimmedLine === "") return; // 空行はスキップ
+
+				// - または * で始まる行はリスト項目
+				if (trimmedLine.startsWith('-') || trimmedLine.startsWith('*')) {
+					// 先頭の - または * と空白を除去
+					const listItem = trimmedLine.replace(/^[-*]\s*/, '').trim();
+					listLines.push(listItem);
+				} else {
+					// それ以外は段落
+					paragraphLines.push(trimmedLine);
+				}
+			});
+
+			// リストコンテンツの構築
 			let listContent = "";
 			if (listLines.length > 0) {
-				listContent = listLines.map((line) => `<li>${line.trim()}</li>`).join("\n");
+				listContent = listLines.map((line) => {
+				// すでにliタグが含まれていたらそのまま、そうでなければliタグで囲む
+				return line.match(/^\s*<li/i) ? line : `<li>${line}</li>`;
+			}).join("\n");
 			} else {
 				listContent = `<li>リスト項目がありません</li>`;
 			}
 
-			output = templateString.replace(/\[TEXT_P\]/g, pText).replace(/\[TEXT_LIST\]/g, listContent);
+			// テンプレートから開始
+			output = templateString;
+
+			// [TEXT_LIST] の置換
+			output = output.replace(/\[TEXT_LIST\]/g, listContent);
+
+			// [TEXT_P_1], [TEXT_P_2], ... の置換（番号付き段落プレースホルダー）
+			paragraphLines.forEach((pLine, index) => {
+				const placeholder = `[TEXT_P_${index + 1}]`;
+				// 正規表現のエスケープ処理をして置換
+				const escapedPlaceholder = placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+				output = output.replace(new RegExp(escapedPlaceholder, 'g'), pLine);
+			});
+
+			// 後方互換性: [TEXT_P] は最初の段落で置換（または全段落を結合）
+			if (paragraphLines.length > 0) {
+				// 最初の段落のみを使用
+				output = output.replace(/\[TEXT_P\]/g, paragraphLines[0]);
+			} else {
+				output = output.replace(/\[TEXT_P\]/g, '段落がありません');
+			}
 		} else if (tagType === "list") {
 			// リストタグの処理 (list)
 			let listContent = text.trim().split("\n")
@@ -820,7 +860,7 @@ document.addEventListener("DOMContentLoaded", function () {
 		if (tagType === "link") {
 			placeholderText = `${tagName}エリア。1行目: 表示テキスト、2行目: リンクURL`;
 		} else if (tagType === "p-list") {
-			placeholderText = `${tagName}エリア。1行目: Pタグの内容、2行目以降: リスト項目`;
+			placeholderText = `${tagName}エリア。通常の行: 段落、「-」または「*」で始まる行: リスト項目`;
 		} else if (tagType === "single") {
 			placeholderText = `${tagName}エリア。テキストを入力してください。改行は<br>になります。`;
 		} else if (tagType === "list") {
