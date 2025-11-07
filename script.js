@@ -39,6 +39,7 @@ document.addEventListener("DOMContentLoaded", function () {
 	let areaIndex = 0;
 	let maxPatternId = 0;
 	let maxTagId = 0;
+	let isLoadingInputAreas = false; // 入力エリア読み込み中フラグ
 
 	// --- 雛形設定のデフォルトデータ（構造変更） ---
 	const defaultTagButtons = [
@@ -118,6 +119,7 @@ document.addEventListener("DOMContentLoaded", function () {
 	const STORAGE_KEY = "customTagPatternsV2";
 	const SETTINGS_KEY = "editorSettingsV2";
 	const SHORTCUTS_KEY = "keyboardShortcutsV2";
+	const INPUT_AREAS_KEY = "inputAreasV2";
 
 	// デフォルトのショートカット設定
 	const defaultShortcuts = {
@@ -166,6 +168,48 @@ document.addEventListener("DOMContentLoaded", function () {
 		}
 	};
 
+	// 入力エリアの保存と読み込み
+	const saveInputAreas = () => {
+		// 読み込み中は保存しない
+		if (isLoadingInputAreas) return;
+
+		const areas = [];
+		const allGroups = container.querySelectorAll(".input-area-group");
+
+		allGroups.forEach((group) => {
+			const textarea = group.querySelector(".input-text-area");
+			if (textarea) {
+				areas.push({
+					tagId: textarea.getAttribute("data-tag-id"),
+					content: textarea.value,
+					groupId: group.id
+				});
+			}
+		});
+
+		localStorage.setItem(INPUT_AREAS_KEY, JSON.stringify(areas));
+	};
+
+	const loadInputAreas = () => {
+		const saved = localStorage.getItem(INPUT_AREAS_KEY);
+		if (!saved) return;
+
+		try {
+			isLoadingInputAreas = true; // 読み込み開始
+			const areas = JSON.parse(saved);
+			areas.forEach((area) => {
+				const tagInfo = getCustomTagInfo(area.tagId);
+				if (tagInfo) {
+					createTextarea(area.tagId, tagInfo.tagType, tagInfo.name, area.content);
+				}
+			});
+		} catch (e) {
+			console.error("入力エリアの読み込みに失敗しました:", e);
+		} finally {
+			isLoadingInputAreas = false; // 読み込み終了
+		}
+	};
+
 	// ショートカット管理UIの構築
 	const buildShortcutUI = () => {
 		const shortcutList = document.getElementById("shortcutList");
@@ -173,10 +217,24 @@ document.addEventListener("DOMContentLoaded", function () {
 
 		shortcutList.innerHTML = "";
 
-		Object.keys(keyboardShortcuts).forEach((key) => {
+		const keys = Object.keys(keyboardShortcuts);
+
+		keys.forEach((key, index) => {
 			const shortcut = keyboardShortcuts[key];
 			const item = document.createElement("div");
 			item.className = "shortcut-item";
+			item.draggable = true;
+			item.dataset.key = key;
+			item.dataset.index = index;
+
+			// ドラッグハンドル
+			const dragHandle = document.createElement("span");
+			dragHandle.textContent = "⋮⋮";
+			dragHandle.style.cursor = "grab";
+			dragHandle.style.marginRight = "8px";
+			dragHandle.style.color = "#999";
+			dragHandle.style.fontSize = "0.9em";
+			dragHandle.title = "ドラッグして順序を変更";
 
 			const label = document.createElement("label");
 			label.textContent = shortcut.displayName;
@@ -203,6 +261,68 @@ document.addEventListener("DOMContentLoaded", function () {
 				}
 			});
 
+			// ドラッグイベント
+			item.addEventListener("dragstart", (e) => {
+				e.dataTransfer.effectAllowed = "move";
+				e.dataTransfer.setData("text/html", e.target.innerHTML);
+				item.classList.add("dragging-shortcut");
+			});
+
+			item.addEventListener("dragend", (e) => {
+				item.classList.remove("dragging-shortcut");
+			});
+
+			item.addEventListener("dragover", (e) => {
+				e.preventDefault();
+				e.dataTransfer.dropEffect = "move";
+
+				const draggingItem = document.querySelector(".dragging-shortcut");
+				if (draggingItem && draggingItem !== item) {
+					const rect = item.getBoundingClientRect();
+					const midpoint = rect.top + rect.height / 2;
+
+					if (e.clientY < midpoint) {
+						item.style.borderTop = "2px solid #4CAF50";
+						item.style.borderBottom = "";
+					} else {
+						item.style.borderTop = "";
+						item.style.borderBottom = "2px solid #4CAF50";
+					}
+				}
+			});
+
+			item.addEventListener("dragleave", (e) => {
+				item.style.borderTop = "";
+				item.style.borderBottom = "";
+			});
+
+			item.addEventListener("drop", (e) => {
+				e.preventDefault();
+				item.style.borderTop = "";
+				item.style.borderBottom = "";
+
+				const draggingItem = document.querySelector(".dragging-shortcut");
+				if (!draggingItem || draggingItem === item) return;
+
+				const fromIndex = parseInt(draggingItem.dataset.index);
+				const toIndex = parseInt(item.dataset.index);
+
+				// オブジェクトを配列に変換して並び替え
+				const entries = Object.entries(keyboardShortcuts);
+				const [movedEntry] = entries.splice(fromIndex, 1);
+				entries.splice(toIndex, 0, movedEntry);
+
+				// 新しいオブジェクトを再構築
+				keyboardShortcuts = {};
+				entries.forEach(([k, v]) => {
+					keyboardShortcuts[k] = v;
+				});
+
+				buildShortcutUI();
+				saveShortcuts();
+			});
+
+			item.appendChild(dragHandle);
 			item.appendChild(label);
 			item.appendChild(input);
 			item.appendChild(deleteButton);
@@ -218,33 +338,33 @@ document.addEventListener("DOMContentLoaded", function () {
 				if (Object.keys(patterns).length === 0) {
 					patterns = defaultPatterns;
 				}
-
-				// IDの最大値を更新
-				Object.keys(patterns).forEach((id) => {
-					const num = parseInt(id.replace("pattern", ""));
-					if (!isNaN(num)) {
-						maxPatternId = Math.max(maxPatternId, num);
-					}
-					// タグIDの最大値も更新
-					patterns[id].buttons.forEach((button) => {
-						if (button.id.startsWith("custom")) {
-							const tagNum = parseInt(button.id.replace("custom", ""));
-							if (!isNaN(tagNum)) {
-								maxTagId = Math.max(maxTagId, tagNum);
-							}
-						}
-					});
-					// 後方互換性：ショートカットがない古いパターンにデフォルトショートカットを追加
-					if (!patterns[id].shortcuts) {
-						patterns[id].shortcuts = JSON.parse(JSON.stringify(defaultShortcuts));
-					}
-				});
 			} catch (e) {
 				patterns = defaultPatterns;
 			}
 		} else {
 			patterns = defaultPatterns;
 		}
+
+		// IDの最大値を更新（ローカルストレージとデフォルトパターンの両方に対応）
+		Object.keys(patterns).forEach((id) => {
+			const num = parseInt(id.replace("pattern", ""));
+			if (!isNaN(num)) {
+				maxPatternId = Math.max(maxPatternId, num);
+			}
+			// タグIDの最大値も更新
+			patterns[id].buttons.forEach((button) => {
+				if (button.id.startsWith("custom")) {
+					const tagNum = parseInt(button.id.replace("custom", ""));
+					if (!isNaN(tagNum)) {
+						maxTagId = Math.max(maxTagId, tagNum);
+					}
+				}
+			});
+			// 後方互換性：ショートカットがない古いパターンにデフォルトショートカットを追加
+			if (!patterns[id].shortcuts) {
+				patterns[id].shortcuts = JSON.parse(JSON.stringify(defaultShortcuts));
+			}
+		});
 
 		const savedSettings = localStorage.getItem(SETTINGS_KEY);
 		let initialSelectedPattern = "pattern1";
@@ -325,9 +445,24 @@ document.addEventListener("DOMContentLoaded", function () {
 	addPatternButton.addEventListener("click", () => {
 		maxPatternId++;
 		const newId = `pattern${maxPatternId}`;
-		const newName = `新しいパターン ${maxPatternId}`;
 
 		// ★★★ 修正箇所 ★★★
+		// 既存のパターン名から「新しいパターン X」の番号を抽出し、最小の空き番号を見つける
+		const existingNumbers = Object.values(patterns)
+			.map(p => {
+				const match = p.name.match(/^新しいパターン\s+(\d+)$/);
+				return match ? parseInt(match[1]) : null;
+			})
+			.filter(n => n !== null);
+
+		// 最小の空き番号を見つける（1から順番にチェック）
+		let nameNumber = 1;
+		while (existingNumbers.includes(nameNumber)) {
+			nameNumber++;
+		}
+
+		const newName = `新しいパターン ${nameNumber}`;
+
 		// 既存のパターンのボタン定義をディープコピー（テンプレートもそのままコピー）
 		const sourcePattern = patterns[getSelectedPatternId()] || patterns[Object.keys(patterns)[0]];
 
@@ -581,12 +716,78 @@ document.addEventListener("DOMContentLoaded", function () {
 			return;
 		}
 
-		currentPattern.buttons.forEach((button) => {
+		currentPattern.buttons.forEach((button, index) => {
 			const item = document.createElement("div");
 			item.className = "tag-item";
 
 			const infoSpan = document.createElement("span");
 			infoSpan.textContent = `${button.name} (${button.tagType})`;
+
+			// ドラッグ可能にする
+			item.draggable = true;
+			item.dataset.index = index;
+
+			// ドラッグハンドル
+			const dragHandle = document.createElement("span");
+			dragHandle.textContent = "⋮⋮";
+			dragHandle.style.cursor = "grab";
+			dragHandle.style.marginRight = "8px";
+			dragHandle.style.color = "#999";
+			dragHandle.title = "ドラッグして順序を変更";
+
+			// ドラッグイベント
+			item.addEventListener("dragstart", (e) => {
+				e.dataTransfer.effectAllowed = "move";
+				e.dataTransfer.setData("text/html", e.target.innerHTML);
+				item.classList.add("dragging");
+			});
+
+			item.addEventListener("dragend", (e) => {
+				item.classList.remove("dragging");
+			});
+
+			item.addEventListener("dragover", (e) => {
+				e.preventDefault();
+				e.dataTransfer.dropEffect = "move";
+
+				const draggingItem = document.querySelector(".dragging");
+				if (draggingItem && draggingItem !== item) {
+					const rect = item.getBoundingClientRect();
+					const midpoint = rect.top + rect.height / 2;
+
+					if (e.clientY < midpoint) {
+						item.style.borderTop = "2px solid #4CAF50";
+						item.style.borderBottom = "";
+					} else {
+						item.style.borderTop = "";
+						item.style.borderBottom = "2px solid #4CAF50";
+					}
+				}
+			});
+
+			item.addEventListener("dragleave", (e) => {
+				item.style.borderTop = "";
+				item.style.borderBottom = "";
+			});
+
+			item.addEventListener("drop", (e) => {
+				e.preventDefault();
+				item.style.borderTop = "";
+				item.style.borderBottom = "";
+
+				const draggingItem = document.querySelector(".dragging");
+				if (!draggingItem || draggingItem === item) return;
+
+				const fromIndex = parseInt(draggingItem.dataset.index);
+				const toIndex = parseInt(item.dataset.index);
+
+				const [movedButton] = currentPattern.buttons.splice(fromIndex, 1);
+				currentPattern.buttons.splice(toIndex, 0, movedButton);
+
+				rebuildTagButtons();
+				rebuildTagButtonList();
+				saveAllPatterns();
+			});
 
 			const editButton = document.createElement("button");
 			editButton.textContent = "編集";
@@ -605,6 +806,7 @@ document.addEventListener("DOMContentLoaded", function () {
 				}
 			});
 
+			item.appendChild(dragHandle);
 			item.appendChild(infoSpan);
 			item.appendChild(editButton);
 			item.appendChild(deleteButton);
@@ -620,15 +822,64 @@ document.addEventListener("DOMContentLoaded", function () {
 		const currentPattern = patterns[patternId];
 		if (!currentPattern) return;
 
-		currentPattern.buttons.forEach((button) => {
+		currentPattern.buttons.forEach((button, index) => {
 			const btn = document.createElement("button");
 			btn.id = `addTagButton-${button.id}`;
 			btn.textContent = button.name;
+			btn.draggable = true;
+			btn.dataset.index = index;
+			btn.style.cursor = "grab";
 
-			// イベントリスナーを動的に割り当て
+			// クリックイベント
 			btn.addEventListener("click", () =>
 				createTextarea(button.id, button.tagType, button.name)
 			);
+
+			// ドラッグイベント
+			btn.addEventListener("dragstart", (e) => {
+				e.dataTransfer.effectAllowed = "move";
+				e.dataTransfer.setData("text/html", e.target.innerHTML);
+				btn.classList.add("dragging-button");
+				btn.style.cursor = "grabbing";
+			});
+
+			btn.addEventListener("dragend", (e) => {
+				btn.classList.remove("dragging-button");
+				btn.style.cursor = "grab";
+			});
+
+			btn.addEventListener("dragover", (e) => {
+				e.preventDefault();
+				e.dataTransfer.dropEffect = "move";
+
+				const draggingButton = document.querySelector(".dragging-button");
+				if (draggingButton && draggingButton !== btn) {
+					btn.style.borderLeft = "3px solid #4CAF50";
+				}
+			});
+
+			btn.addEventListener("dragleave", (e) => {
+				btn.style.borderLeft = "";
+			});
+
+			btn.addEventListener("drop", (e) => {
+				e.preventDefault();
+				btn.style.borderLeft = "";
+
+				const draggingButton = document.querySelector(".dragging-button");
+				if (!draggingButton || draggingButton === btn) return;
+
+				const fromIndex = parseInt(draggingButton.dataset.index);
+				const toIndex = parseInt(btn.dataset.index);
+
+				// 配列を並び替え
+				const [movedButton] = currentPattern.buttons.splice(fromIndex, 1);
+				currentPattern.buttons.splice(toIndex, 0, movedButton);
+
+				rebuildTagButtons();
+				rebuildTagButtonList();
+				saveAllPatterns();
+			});
 
 			tagButtonsContainer.appendChild(btn);
 		});
@@ -829,7 +1080,7 @@ document.addEventListener("DOMContentLoaded", function () {
 	};
 
 	// テキストエリアを作成し、選択された位置に挿入する関数 (引数を変更)
-	const createTextarea = (tagId, tagType, tagName) => {
+	const createTextarea = (tagId, tagType, tagName, initialContent = "") => {
 		areaIndex++;
 		const groupDiv = document.createElement("div");
 		groupDiv.className = "input-area-group";
@@ -850,10 +1101,16 @@ document.addEventListener("DOMContentLoaded", function () {
 		newTextarea.className = `input-text-area input-${tagId}-area`;
 		newTextarea.id = `text-area-${tagId}-${areaIndex}`;
 		newTextarea.setAttribute("data-tag-id", tagId); // タグIDをデータ属性として保持
+		newTextarea.value = initialContent; // 初期コンテンツを設定
 
 		newTextarea.rows = 3;
 		newTextarea.cols = 50;
 		newTextarea.style.resize = "vertical";
+
+		// テキストエリアの内容が変更されたら保存
+		newTextarea.addEventListener("input", () => {
+			saveInputAreas();
+		});
 
 		let placeholderText = `${tagName}タグ用のテキストエリア`;
 
@@ -877,6 +1134,7 @@ document.addEventListener("DOMContentLoaded", function () {
 		deleteButton.addEventListener("click", () => {
 			groupDiv.remove();
 			updateInsertionPoints();
+			saveInputAreas(); // 削除後に保存
 		});
 
 		groupDiv.appendChild(tagLabel);
@@ -900,6 +1158,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
 		updateInsertionPoints();
 		insertionPointSelector.value = groupDiv.id;
+		saveInputAreas(); // 作成後に保存
 	};
 
 	// --- ページ初期化 ---
@@ -907,6 +1166,7 @@ document.addEventListener("DOMContentLoaded", function () {
 	loadShortcuts();
 	buildShortcutUI(); // ショートカット管理UIを初期表示
 	rebuildTagButtonList(); // タグボタン管理一覧を初期表示
+	loadInputAreas(); // 入力エリアを復元
 
 	// --- その他の機能 (変更なし) ---
 
