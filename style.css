@@ -44,8 +44,14 @@ body {
 	display: flex;
 	align-items: stretch;
 	margin-bottom: 10px;
+	transition: all 0.2s;
 }
-.input-area-group textarea {
+.input-area-group.dragging-input-area {
+	opacity: 0.5;
+	background-color: #e3f2fd;
+}
+.input-area-group textarea,
+.input-area-group .input-text-area {
 	flex-grow: 1;
 	width: 100%;
 	min-width: 0;
@@ -55,6 +61,40 @@ body {
 	font-family: inherit;
 	font-size: 1em;
 	box-sizing: border-box;
+	min-height: 60px;
+	overflow-y: auto;
+	white-space: pre-wrap;
+	word-wrap: break-word;
+}
+
+/* contenteditable div のスタイル */
+.input-text-area[contenteditable="true"] {
+	background-color: white;
+	cursor: text;
+}
+
+.input-text-area[contenteditable="true"]:focus {
+	outline: 2px solid #4CAF50;
+	outline-offset: -1px;
+}
+
+/* 入力エリア内の strong タグを太字で表示 */
+.input-text-area strong {
+	font-weight: bold;
+}
+
+/* 入力エリア内の mark タグを黄色ハイライトで表示 */
+.input-text-area mark {
+	background-color: yellow;
+	color: black;
+	padding: 0 2px;
+}
+
+/* contenteditable div のプレースホルダー表示 */
+.input-text-area[contenteditable="true"]:empty::before {
+	content: attr(data-placeholder);
+	color: #999;
+	pointer-events: none;
 }
 .input-area-group button {
 	flex-shrink: 0;
@@ -145,6 +185,21 @@ body {
 	padding: 10px;
 	margin-bottom: 15px;
 	background-color: #f5f5f5;
+}
+/* --- 書式マッピング管理エリア --- */
+#formattingManagement {
+	border: 1px solid #ccc;
+	padding: 10px;
+	margin-bottom: 15px;
+	background-color: #f5f5f5;
+}
+#formattingList {
+	max-height: 300px;
+	overflow-y: auto;
+	margin-top: 10px;
+	padding: 5px;
+	border: 1px solid #ddd;
+	background-color: white;
 }
 #shortcutManagement button {
 	margin-bottom: 10px;

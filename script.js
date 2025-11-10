@@ -36,12 +36,24 @@ document.addEventListener("DOMContentLoaded", function () {
 	const shortcutTagInput = document.getElementById("shortcutTagInput");
 	const closeShortcutModalSpan = document.getElementById("closeShortcutModal");
 
+	// 書式マッピング管理関連
+	const formattingList = document.getElementById("formattingList");
+
 	let areaIndex = 0;
 	let maxPatternId = 0;
 	let maxTagId = 0;
 	let isLoadingInputAreas = false; // 入力エリア読み込み中フラグ
 
 	// --- 雛形設定のデフォルトデータ（構造変更） ---
+
+	// デフォルトの書式マッピング設定（Word貼り付け用）
+	const defaultFormattingMap = {
+		bold: { tag: "strong", displayName: "太字 (Bold)" },
+		italic: { tag: "em", displayName: "斜体 (Italic)" },
+		underline: { tag: "u", displayName: "下線 (Underline)" },
+		highlight: { tag: "mark", displayName: "ハイライト (Highlight)" },
+	};
+
 	const defaultTagButtons = [
 		// id, name, template, tagType (single, list, link, p-list)
 		{ id: "p", name: "pタグ", template: "<p>[TEXT]</p>", tagType: "single" },
@@ -79,6 +91,7 @@ document.addEventListener("DOMContentLoaded", function () {
 				L: { tag: "li", displayName: "Ctrl/Cmd+L" },
 				K: { tag: "a", displayName: "Ctrl/Cmd+K" },
 			},
+			formattingMap: JSON.parse(JSON.stringify(defaultFormattingMap)),
 		},
 		pattern2: {
 			name: "カスタム例",
@@ -110,6 +123,7 @@ document.addEventListener("DOMContentLoaded", function () {
 				L: { tag: "li", displayName: "Ctrl/Cmd+L" },
 				K: { tag: "a", displayName: "Ctrl/Cmd+K" },
 			},
+			formattingMap: JSON.parse(JSON.stringify(defaultFormattingMap)),
 		},
 	};
 
@@ -131,6 +145,7 @@ document.addEventListener("DOMContentLoaded", function () {
 	};
 
 	let keyboardShortcuts = {};
+	let formattingMap = {};
 
 	const saveAllPatterns = () => {
 		const selectedId = getSelectedPatternId();
@@ -168,6 +183,31 @@ document.addEventListener("DOMContentLoaded", function () {
 		}
 	};
 
+	const saveFormattingMap = () => {
+		const patternId = getSelectedPatternId();
+		const currentPattern = patterns[patternId];
+
+		if (currentPattern) {
+			currentPattern.formattingMap = formattingMap;
+			saveAllPatterns();
+		}
+	};
+
+	const loadFormattingMap = () => {
+		const patternId = getSelectedPatternId();
+		const currentPattern = patterns[patternId];
+
+		if (currentPattern && currentPattern.formattingMap) {
+			formattingMap = currentPattern.formattingMap;
+		} else {
+			// フォールバック：パターンに書式マッピングがない場合はデフォルトを設定
+			formattingMap = JSON.parse(JSON.stringify(defaultFormattingMap));
+			if (currentPattern) {
+				currentPattern.formattingMap = formattingMap;
+			}
+		}
+	};
+
 	// 入力エリアの保存と読み込み
 	const saveInputAreas = () => {
 		// 読み込み中は保存しない
@@ -181,7 +221,7 @@ document.addEventListener("DOMContentLoaded", function () {
 			if (textarea) {
 				areas.push({
 					tagId: textarea.getAttribute("data-tag-id"),
-					content: textarea.value,
+					content: textarea.innerHTML,
 					groupId: group.id
 				});
 			}
@@ -330,6 +370,38 @@ document.addEventListener("DOMContentLoaded", function () {
 		});
 	};
 
+	// 書式マッピング管理UIの構築
+	const buildFormattingUI = () => {
+		if (!formattingList) return;
+
+		formattingList.innerHTML = "";
+
+		const types = Object.keys(formattingMap);
+
+		types.forEach((type) => {
+			const formatting = formattingMap[type];
+			const item = document.createElement("div");
+			item.className = "shortcut-item"; // 同じスタイルを使用
+
+			const label = document.createElement("label");
+			label.textContent = formatting.displayName;
+
+			const input = document.createElement("input");
+			input.type = "text";
+			input.value = formatting.tag;
+			input.placeholder = "タグ名を入力 (例: strong, em, mark)";
+
+			input.addEventListener("input", (e) => {
+				formattingMap[type].tag = e.target.value.trim();
+				saveFormattingMap();
+			});
+
+			item.appendChild(label);
+			item.appendChild(input);
+			formattingList.appendChild(item);
+		});
+	};
+
 	const loadAllPatterns = () => {
 		const savedPatterns = localStorage.getItem(STORAGE_KEY);
 		if (savedPatterns) {
@@ -363,6 +435,10 @@ document.addEventListener("DOMContentLoaded", function () {
 			// 後方互換性：ショートカットがない古いパターンにデフォルトショートカットを追加
 			if (!patterns[id].shortcuts) {
 				patterns[id].shortcuts = JSON.parse(JSON.stringify(defaultShortcuts));
+			}
+			// 後方互換性：書式マッピングがない古いパターンにデフォルト書式マッピングを追加
+			if (!patterns[id].formattingMap) {
+				patterns[id].formattingMap = JSON.parse(JSON.stringify(defaultFormattingMap));
 			}
 		});
 
@@ -410,6 +486,8 @@ document.addEventListener("DOMContentLoaded", function () {
 				rebuildTagButtonList(); // タグボタン管理一覧を更新
 				loadShortcuts(); // ショートカットを再読み込み
 				buildShortcutUI(); // ショートカットUIを再構築
+				loadFormattingMap(); // 書式マッピングを再読み込み
+				buildFormattingUI(); // 書式マッピングUIを再構築
 				saveAllPatterns();
 			});
 
@@ -482,6 +560,8 @@ document.addEventListener("DOMContentLoaded", function () {
 			),
 			// ショートカットもコピー
 			shortcuts: JSON.parse(JSON.stringify(sourcePattern.shortcuts || defaultShortcuts)),
+			// 書式マッピングもコピー
+			formattingMap: JSON.parse(JSON.stringify(sourcePattern.formattingMap || defaultFormattingMap)),
 		};
 
 		rebuildPatternUI(newId);
@@ -489,6 +569,8 @@ document.addEventListener("DOMContentLoaded", function () {
 		rebuildTagButtonList();
 		loadShortcuts(); // 新しいパターンのショートカットを読み込み
 		buildShortcutUI(); // ショートカットUIを再構築
+		loadFormattingMap(); // 新しいパターンの書式マッピングを読み込み
+		buildFormattingUI(); // 書式マッピングUIを再構築
 		saveAllPatterns();
 	});
 
@@ -525,6 +607,8 @@ document.addEventListener("DOMContentLoaded", function () {
 			rebuildTagButtonList();
 			loadShortcuts(); // 新しいパターンのショートカットを読み込み
 			buildShortcutUI(); // ショートカットUIを再構築
+			loadFormattingMap(); // 新しいパターンの書式マッピングを読み込み
+			buildFormattingUI(); // 書式マッピングUIを再構築
 			saveAllPatterns();
 		}
 	});
@@ -639,6 +723,9 @@ document.addEventListener("DOMContentLoaded", function () {
 		switch (selectedType) {
 			case "single":
 				placeholder = '例: <p class="custom">[TEXT]</p>';
+				break;
+			case "multi":
+				placeholder = '例: <p class="item">[TEXT]</p>\n\n※各行が個別のタグとして出力されます';
 				break;
 			case "list":
 				placeholder = "例:\n<ul>\n[TEXT]\n</ul>\n\n※[TEXT]は各行が<li>...</li>に置換されます";
@@ -900,7 +987,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
 	// 共通の変換ロジック (タグタイプに応じて処理を振り分けるように変更)
 	function convertTextToHtmlString(textareaElement) {
-		const text = textareaElement.value;
+		const text = textareaElement.innerHTML;
 		if (!text || text.trim() === "") return ""; // 空白/空の場合は空文字を返す
 
 		const tagId = textareaElement.getAttribute("data-tag-id");
@@ -1002,6 +1089,17 @@ document.addEventListener("DOMContentLoaded", function () {
 			// 単一タグの処理 (single)
 			let content = text.trim().replace(/\n/g, "<br>");
 			output = templateString.replace(/\[TEXT\]/g, content);
+		} else if (tagType === "multi") {
+			// マルチラインタグの処理 (multi) - 各行が個別のタグになる
+			const lines = text.trim().split("\n").filter((line) => line.trim() !== "");
+
+			if (lines.length > 0) {
+				output = lines.map((line) => {
+					return templateString.replace(/\[TEXT\]/g, line.trim());
+				}).join("\n");
+			} else {
+				output = `<!-- 警告: テキストが入力されていません -->\n`;
+			}
 		} else if (tagType === "link-list") {
 			// リンクリストの処理 (link-list)
 			const lines = text.trim().split("\n").map((line) => line.trim()).filter((line) => line !== "");
@@ -1079,6 +1177,163 @@ document.addEventListener("DOMContentLoaded", function () {
 		}
 	};
 
+	// Word書式を保持した貼り付けの処理
+	const handleFormattedPaste = (event, editableDiv) => {
+		const clipboardData = event.clipboardData || window.clipboardData;
+		if (!clipboardData) return;
+
+		// HTMLデータを取得
+		const htmlData = clipboardData.getData("text/html");
+		if (!htmlData) return; // HTMLデータがない場合は通常の貼り付けを許可
+
+		event.preventDefault(); // デフォルトの貼り付けをキャンセル
+
+		// HTMLをパースして変換
+		const convertedHTML = convertWordHTMLToTags(htmlData);
+
+		// contenteditable の場合、カーソル位置にHTMLを挿入
+		const selection = window.getSelection();
+		if (!selection.rangeCount) return;
+
+		const range = selection.getRangeAt(0);
+		range.deleteContents();
+
+		// HTMLフラグメントを作成して挿入
+		const tempDiv = document.createElement("div");
+		tempDiv.innerHTML = convertedHTML;
+		const fragment = document.createDocumentFragment();
+		while (tempDiv.firstChild) {
+			fragment.appendChild(tempDiv.firstChild);
+		}
+		range.insertNode(fragment);
+
+		// カーソルを挿入した内容の最後に移動
+		range.collapse(false);
+		selection.removeAllRanges();
+		selection.addRange(range);
+
+		// 保存をトリガー
+		saveInputAreas();
+	};
+
+	// Word HTMLを設定されたタグに変換
+	const convertWordHTMLToTags = (html) => {
+		// 一時的なdiv要素でHTMLをパース
+		const tempDiv = document.createElement("div");
+		tempDiv.innerHTML = html;
+
+		// style、script、コメントノードを削除
+		const removeUnwantedNodes = (parent) => {
+			const nodesToRemove = [];
+
+			for (let node of parent.childNodes) {
+				// コメントノード、style、scriptタグを削除対象にマーク
+				if (node.nodeType === Node.COMMENT_NODE) {
+					nodesToRemove.push(node);
+				} else if (node.nodeType === Node.ELEMENT_NODE) {
+					const tagName = node.tagName.toLowerCase();
+					if (tagName === "style" || tagName === "script" || tagName === "meta" || tagName === "link") {
+						nodesToRemove.push(node);
+					} else if (tagName === "p") {
+						// Wordが出力する不要なCSSコードを含むp要素をフィルタ
+						const textContent = node.textContent.trim();
+						// CSSコード、コメントマーカー、@font-face、mso-などを含むp要素を削除
+						if (
+							textContent.startsWith("<!--") ||
+							textContent.startsWith("-->") ||
+							textContent.startsWith("/*") ||
+							textContent.startsWith("*/") ||
+							textContent.includes("@font-face") ||
+							textContent.includes("@page") ||
+							textContent.includes("mso-") ||
+							textContent.includes("panose-") ||
+							textContent.match(/^\s*\{/) ||
+							textContent.match(/^\s*\}/) ||
+							textContent.includes("Style Definitions") ||
+							textContent.includes("Font Definitions") ||
+							textContent.includes("Page Definitions")
+						) {
+							nodesToRemove.push(node);
+						} else {
+							// 通常のp要素は子要素もチェック
+							removeUnwantedNodes(node);
+						}
+					} else {
+						// 再帰的に子要素もチェック
+						removeUnwantedNodes(node);
+					}
+				}
+			}
+
+			// マークしたノードを削除
+			nodesToRemove.forEach(node => node.remove());
+		};
+
+		removeUnwantedNodes(tempDiv);
+
+		// テキストノードと書式を再帰的に処理
+		const processNode = (node) => {
+			if (node.nodeType === Node.TEXT_NODE) {
+				// タブを通常のスペースに変換し、同一行内の連続スペースを1つにまとめる
+				// 改行は保持する
+				return node.textContent
+					.replace(/\t/g, " ")  // タブをスペースに変換
+					.replace(/[^\S\r\n]+/g, " ");  // 改行以外の連続空白文字を1つのスペースに
+			}
+
+			if (node.nodeType === Node.ELEMENT_NODE) {
+				const tagName = node.tagName.toLowerCase();
+				let result = "";
+				let openTag = "";
+				let closeTag = "";
+
+				// br タグや p タグの改行を処理
+				if (tagName === "br") {
+					return "\n";
+				} else if (tagName === "p" || tagName === "div") {
+					// p や div タグの前後に改行を追加（末尾のみ）
+					closeTag = "\n";
+				}
+
+				// Word/ブラウザの書式タグをカスタムタグにマッピング
+				// 太字とマーカーのみを保持し、他の書式は無視する
+				if ((tagName === "b" || tagName === "strong") && formattingMap.bold) {
+					openTag = `<${formattingMap.bold.tag}>`;
+					closeTag = `</${formattingMap.bold.tag}>`;
+				} else if ((tagName === "mark" || (tagName === "span" && node.style.backgroundColor)) && formattingMap.highlight) {
+					// ハイライト（背景色がある場合も含む）
+					// Word のハイライトは span の background-color として来ることがある
+					openTag = `<${formattingMap.highlight.tag}>`;
+					closeTag = `</${formattingMap.highlight.tag}>`;
+				}
+				// 斜体、下線などの他の書式は無視（タグを付けずに子ノードのみ処理）
+
+				// 子ノードを処理
+				for (let child of node.childNodes) {
+					result += processNode(child);
+				}
+
+				return openTag + result + closeTag;
+			}
+
+			return "";
+		};
+
+		// ルート要素の子ノードを処理
+		let convertedText = "";
+		for (let child of tempDiv.childNodes) {
+			convertedText += processNode(child);
+		}
+
+		// 最終的な整形：前後の空白を削除、改行を保持しつつ同一行内の連続スペースを1つに
+		convertedText = convertedText
+			.trim()
+			.replace(/[^\S\r\n]+/g, " ")  // 改行以外の連続空白を1つのスペースに
+			.replace(/\n+/g, "\n");  // 連続する改行を1つに統一
+
+		return convertedText;
+	};
+
 	// テキストエリアを作成し、選択された位置に挿入する関数 (引数を変更)
 	const createTextarea = (tagId, tagType, tagName, initialContent = "") => {
 		areaIndex++;
@@ -1088,6 +1343,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
 		const tagLabel = document.createElement("span");
 		tagLabel.className = "input-label-tag";
+		tagLabel.draggable = true;  // ラベルのみドラッグ可能に
+		tagLabel.style.cursor = "grab";
+		tagLabel.title = "ドラッグして順序を変更";
 
 		const numberPrefix = document.createElement("span");
 		numberPrefix.className = "number-prefix";
@@ -1097,19 +1355,82 @@ document.addEventListener("DOMContentLoaded", function () {
 		tagTextSpan.textContent = tagName;
 		tagLabel.appendChild(tagTextSpan);
 
-		const newTextarea = document.createElement("textarea");
+		// ドラッグイベント（ラベルのみ）
+		tagLabel.addEventListener("dragstart", (e) => {
+			e.dataTransfer.effectAllowed = "move";
+			e.dataTransfer.setData("text/html", groupDiv.id);
+			groupDiv.classList.add("dragging-input-area");
+			tagLabel.style.cursor = "grabbing";
+		});
+
+		tagLabel.addEventListener("dragend", (e) => {
+			groupDiv.classList.remove("dragging-input-area");
+			tagLabel.style.cursor = "grab";
+		});
+
+		groupDiv.addEventListener("dragover", (e) => {
+			e.preventDefault();
+			e.dataTransfer.dropEffect = "move";
+
+			const draggingGroup = document.querySelector(".dragging-input-area");
+			if (draggingGroup && draggingGroup !== groupDiv) {
+				const rect = groupDiv.getBoundingClientRect();
+				const midpoint = rect.top + rect.height / 2;
+
+				if (e.clientY < midpoint) {
+					groupDiv.style.borderTop = "3px solid #4CAF50";
+					groupDiv.style.borderBottom = "";
+				} else {
+					groupDiv.style.borderTop = "";
+					groupDiv.style.borderBottom = "3px solid #4CAF50";
+				}
+			}
+		});
+
+		groupDiv.addEventListener("dragleave", (e) => {
+			groupDiv.style.borderTop = "";
+			groupDiv.style.borderBottom = "";
+		});
+
+		groupDiv.addEventListener("drop", (e) => {
+			e.preventDefault();
+			groupDiv.style.borderTop = "";
+			groupDiv.style.borderBottom = "";
+
+			const draggingGroup = document.querySelector(".dragging-input-area");
+			if (!draggingGroup || draggingGroup === groupDiv) return;
+
+			// 位置を判定
+			const rect = groupDiv.getBoundingClientRect();
+			const midpoint = rect.top + rect.height / 2;
+
+			if (e.clientY < midpoint) {
+				// 上に挿入
+				container.insertBefore(draggingGroup, groupDiv);
+			} else {
+				// 下に挿入
+				container.insertBefore(draggingGroup, groupDiv.nextSibling);
+			}
+
+			updateInsertionPoints();
+			saveInputAreas();
+		});
+
+		const newTextarea = document.createElement("div");
 		newTextarea.className = `input-text-area input-${tagId}-area`;
 		newTextarea.id = `text-area-${tagId}-${areaIndex}`;
+		newTextarea.setAttribute("contenteditable", "true");
 		newTextarea.setAttribute("data-tag-id", tagId); // タグIDをデータ属性として保持
-		newTextarea.value = initialContent; // 初期コンテンツを設定
-
-		newTextarea.rows = 3;
-		newTextarea.cols = 50;
-		newTextarea.style.resize = "vertical";
+		newTextarea.innerHTML = initialContent; // 初期コンテンツを設定
 
 		// テキストエリアの内容が変更されたら保存
 		newTextarea.addEventListener("input", () => {
 			saveInputAreas();
+		});
+
+		// 貼り付けイベント：Word書式を保持
+		newTextarea.addEventListener("paste", (e) => {
+			handleFormattedPaste(e, newTextarea);
 		});
 
 		let placeholderText = `${tagName}タグ用のテキストエリア`;
@@ -1120,12 +1441,14 @@ document.addEventListener("DOMContentLoaded", function () {
 			placeholderText = `${tagName}エリア。通常の行: 段落、「-」または「*」で始まる行: リスト項目`;
 		} else if (tagType === "single") {
 			placeholderText = `${tagName}エリア。テキストを入力してください。改行は<br>になります。`;
+		} else if (tagType === "multi") {
+			placeholderText = `${tagName}エリア。各行が個別のタグとして出力されます。`;
 		} else if (tagType === "list") {
 			placeholderText = `${tagName}エリア。各行がliタグに変換されます。`;
 		} else if (tagType === "link-list") {
 			placeholderText = `${tagName}エリア。奇数行: リンクテキスト、偶数行: URL を交互に入力`;
 		}
-		newTextarea.placeholder = placeholderText;
+		newTextarea.setAttribute("data-placeholder", placeholderText);
 
 		const deleteButton = document.createElement("button");
 		deleteButton.textContent = "削除";
@@ -1165,6 +1488,8 @@ document.addEventListener("DOMContentLoaded", function () {
 	loadAllPatterns();
 	loadShortcuts();
 	buildShortcutUI(); // ショートカット管理UIを初期表示
+	loadFormattingMap();
+	buildFormattingUI(); // 書式マッピング管理UIを初期表示
 	rebuildTagButtonList(); // タグボタン管理一覧を初期表示
 	loadInputAreas(); // 入力エリアを復元
 
