@@ -48,10 +48,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
 	// デフォルトの書式マッピング設定（Word貼り付け用）
 	const defaultFormattingMap = {
-		bold: { tag: "strong", displayName: "太字 (Bold)" },
-		italic: { tag: "em", displayName: "斜体 (Italic)" },
-		underline: { tag: "u", displayName: "下線 (Underline)" },
-		highlight: { tag: "mark", displayName: "ハイライト (Highlight)" },
+		bold: { template: "<strong>[TEXT]</strong>", displayName: "太字 (Bold)" },
+		italic: { template: "<em>[TEXT]</em>", displayName: "斜体 (Italic)" },
+		underline: { template: "<u>[TEXT]</u>", displayName: "下線 (Underline)" },
+		highlight: { template: "<mark>[TEXT]</mark>", displayName: "ハイライト (Highlight)" },
 	};
 
 	const defaultTagButtons = [
@@ -388,11 +388,13 @@ document.addEventListener("DOMContentLoaded", function () {
 
 			const input = document.createElement("input");
 			input.type = "text";
-			input.value = formatting.tag;
-			input.placeholder = "タグ名を入力 (例: strong, em, mark)";
+			input.value = formatting.template || formatting.tag || ""; // 後方互換性のため tag もチェック
+			input.placeholder = "テンプレートを入力 (例: <strong>[TEXT]</strong>)";
 
 			input.addEventListener("input", (e) => {
-				formattingMap[type].tag = e.target.value.trim();
+				formattingMap[type].template = e.target.value.trim();
+				// 後方互換性のため tag プロパティも削除
+				delete formattingMap[type].tag;
 				saveFormattingMap();
 			});
 
@@ -439,6 +441,17 @@ document.addEventListener("DOMContentLoaded", function () {
 			// 後方互換性：書式マッピングがない古いパターンにデフォルト書式マッピングを追加
 			if (!patterns[id].formattingMap) {
 				patterns[id].formattingMap = JSON.parse(JSON.stringify(defaultFormattingMap));
+			}
+			// 後方互換性：古い tag 形式を新しい template 形式に変換
+			if (patterns[id].formattingMap) {
+				Object.keys(patterns[id].formattingMap).forEach((type) => {
+					const formatting = patterns[id].formattingMap[type];
+					if (formatting.tag && !formatting.template) {
+						// tag を template に変換
+						formatting.template = `<${formatting.tag}>[TEXT]</${formatting.tag}>`;
+						delete formatting.tag;
+					}
+				});
 			}
 		});
 
@@ -1011,9 +1024,18 @@ document.addEventListener("DOMContentLoaded", function () {
 
 				let result = "";
 
-				// formatting タグの開始タグを追加
+				// formatting タグの開始タグを追加（属性も含めて）
 				if (isFormatting) {
-					result += `<${tagName}>`;
+					let openTag = `<${tagName}`;
+					// 属性があれば追加
+					if (node.attributes && node.attributes.length > 0) {
+						for (let i = 0; i < node.attributes.length; i++) {
+							const attr = node.attributes[i];
+							openTag += ` ${attr.name}="${attr.value}"`;
+						}
+					}
+					openTag += `>`;
+					result += openTag;
 				}
 
 				// 子ノードを処理
@@ -1280,6 +1302,19 @@ document.addEventListener("DOMContentLoaded", function () {
 		saveInputAreas();
 	};
 
+	// テンプレートから開始タグと終了タグを抽出するヘルパー関数
+	const extractTagsFromTemplate = (template) => {
+		if (!template || typeof template !== 'string') {
+			return { openTag: "", closeTag: "" };
+		}
+		// [TEXT] で分割して開始タグと終了タグを取得
+		const parts = template.split("[TEXT]");
+		return {
+			openTag: parts[0] || "",
+			closeTag: parts[1] || ""
+		};
+	};
+
 	// Word HTMLを設定されたタグに変換
 	const convertWordHTMLToTags = (html) => {
 		// 一時的なdiv要素でHTMLをパース
@@ -1362,13 +1397,26 @@ document.addEventListener("DOMContentLoaded", function () {
 				// Word/ブラウザの書式タグをカスタムタグにマッピング
 				// 太字とマーカーのみを保持し、他の書式は無視する
 				if ((tagName === "b" || tagName === "strong") && formattingMap.bold) {
-					openTag = `<${formattingMap.bold.tag}>`;
-					closeTag = `</${formattingMap.bold.tag}>`;
+					// テンプレートから開始タグと終了タグを抽出（後方互換性のため tag もサポート）
+					if (formattingMap.bold.template) {
+						const tags = extractTagsFromTemplate(formattingMap.bold.template);
+						openTag = tags.openTag;
+						closeTag = tags.closeTag;
+					} else if (formattingMap.bold.tag) {
+						openTag = `<${formattingMap.bold.tag}>`;
+						closeTag = `</${formattingMap.bold.tag}>`;
+					}
 				} else if ((tagName === "mark" || (tagName === "span" && node.style.backgroundColor)) && formattingMap.highlight) {
 					// ハイライト（背景色がある場合も含む）
 					// Word のハイライトは span の background-color として来ることがある
-					openTag = `<${formattingMap.highlight.tag}>`;
-					closeTag = `</${formattingMap.highlight.tag}>`;
+					if (formattingMap.highlight.template) {
+						const tags = extractTagsFromTemplate(formattingMap.highlight.template);
+						openTag = tags.openTag;
+						closeTag = tags.closeTag;
+					} else if (formattingMap.highlight.tag) {
+						openTag = `<${formattingMap.highlight.tag}>`;
+						closeTag = `</${formattingMap.highlight.tag}>`;
+					}
 				}
 				// 斜体、下線などの他の書式は無視（タグを付けずに子ノードのみ処理）
 
