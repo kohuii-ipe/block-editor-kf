@@ -95,6 +95,13 @@ body {
 	content: attr(data-placeholder);
 	color: #999;
 	pointer-events: none;
+	display: block;
+	opacity: 0.6;
+}
+
+/* フォーカス時にもプレースホルダーを表示（薄く） */
+.input-text-area[contenteditable="true"]:empty:focus::before {
+	color: #bbb;
 }
 .input-area-group button {
 	flex-shrink: 0;

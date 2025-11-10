@@ -1421,7 +1421,10 @@ document.addEventListener("DOMContentLoaded", function () {
 		newTextarea.id = `text-area-${tagId}-${areaIndex}`;
 		newTextarea.setAttribute("contenteditable", "true");
 		newTextarea.setAttribute("data-tag-id", tagId); // タグIDをデータ属性として保持
-		newTextarea.innerHTML = initialContent; // 初期コンテンツを設定
+		// 初期コンテンツを設定（空の場合は完全に空にしてプレースホルダーを表示）
+		if (initialContent && initialContent.trim() !== "") {
+			newTextarea.innerHTML = initialContent;
+		}
 
 		// テキストエリアの内容が変更されたら保存
 		newTextarea.addEventListener("input", () => {
