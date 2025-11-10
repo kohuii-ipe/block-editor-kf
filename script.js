@@ -985,10 +985,74 @@ document.addEventListener("DOMContentLoaded", function () {
 		return currentPattern.buttons.find((b) => b.id === tagId);
 	};
 
+	// contenteditable div から改行を保持したテキストを取得するヘルパー関数
+	// formatting タグ（strong, mark）は保持し、block要素は改行に変換
+	function getTextWithLineBreaks(htmlContent) {
+		const tempDiv = document.createElement("div");
+		tempDiv.innerHTML = htmlContent;
+
+		const processNode = (node) => {
+			if (node.nodeType === Node.TEXT_NODE) {
+				return node.textContent;
+			}
+
+			if (node.nodeType === Node.ELEMENT_NODE) {
+				const tagName = node.tagName.toLowerCase();
+
+				// br は改行に変換
+				if (tagName === "br") {
+					return "\n";
+				}
+
+				// block 要素は改行で区切る
+				const isBlock = ["div", "p"].includes(tagName);
+				// formatting タグは保持
+				const isFormatting = ["strong", "mark", "b", "em", "u", "span"].includes(tagName);
+
+				let result = "";
+
+				// formatting タグの開始タグを追加
+				if (isFormatting) {
+					result += `<${tagName}>`;
+				}
+
+				// 子ノードを処理
+				for (let child of node.childNodes) {
+					result += processNode(child);
+				}
+
+				// formatting タグの終了タグを追加
+				if (isFormatting) {
+					result += `</${tagName}>`;
+				}
+
+				// block 要素の後に改行を追加
+				if (isBlock) {
+					result += "\n";
+				}
+
+				return result;
+			}
+
+			return "";
+		};
+
+		let text = "";
+		for (let child of tempDiv.childNodes) {
+			text += processNode(child);
+		}
+
+		// 末尾の余分な改行を削除
+		return text.replace(/\n+$/, "");
+	}
+
 	// 共通の変換ロジック (タグタイプに応じて処理を振り分けるように変更)
 	function convertTextToHtmlString(textareaElement) {
-		const text = textareaElement.innerHTML;
-		if (!text || text.trim() === "") return ""; // 空白/空の場合は空文字を返す
+		const htmlContent = textareaElement.innerHTML;
+		if (!htmlContent || htmlContent.trim() === "") return ""; // 空白/空の場合は空文字を返す
+
+		// HTMLから改行を保持したテキストを取得
+		const text = getTextWithLineBreaks(htmlContent);
 
 		const tagId = textareaElement.getAttribute("data-tag-id");
 		const tagInfo = getCustomTagInfo(tagId);
