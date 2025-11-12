@@ -44,28 +44,22 @@ document.addEventListener("DOMContentLoaded", function () {
 	};
 
 	const defaultTagButtons = [
-		// id, name, template, tagType (single, list, link, p-list)
-		{ id: "p", name: "pタグ", template: "<p>[TEXT]</p>", tagType: "single" },
-		{ id: "h2", name: "h2タグ", template: "<h2>[TEXT]</h2>", tagType: "single" },
-		{
-			id: "a-int",
-			name: "内部リンク",
-			template: '<a href="[URL]">[TEXT]</a>',
-			tagType: "link",
-		},
-		{
-			id: "a-ext",
-			name: "外部リンク",
-			template: '<a href="[URL]" target="_blank">[TEXT]</a>',
-			tagType: "link",
-		},
-		{ id: "ul", name: "ULタグ", template: "<ul>\n[TEXT]\n</ul>", tagType: "list" },
-		{ id: "box", name: "枠", template: '<div class="box">\n[TEXT]\n</div>', tagType: "single" },
+		// id, name, template, tagType (multi, p-list, link-list)
+		{ id: "p", name: "pタグ", template: "<p>[TEXT]</p>", tagType: "multi" },
+		{ id: "h2", name: "h2タグ", template: "<h2>[TEXT]</h2>", tagType: "multi" },
+		{ id: "box", name: "枠", template: '<div class="box">[TEXT]</div>', tagType: "multi" },
 		{
 			id: "box-p-ul",
 			name: "箇条書きリスト",
 			template: '<div class="box"><p>[TEXT_P_1]</p><p>[TEXT_P_2]</p><ul>\n[TEXT_LIST]\n</ul></div>',
 			tagType: "p-list",
+		},
+		{
+			id: "link-list-sample",
+			name: "リンクリスト",
+			template: '<div class="link-wrapper">\n<ul>\n[LINK_LIST]\n</ul>\n</div>',
+			tagType: "link-list",
+			linkItemTemplate: '<li><a href="[URL]">[TEXT]</a></li>',
 		},
 	];
 
@@ -502,17 +496,8 @@ document.addEventListener("DOMContentLoaded", function () {
 		}
 
 		switch (selectedType) {
-			case "single":
-				placeholder = '例: <p class="custom">[TEXT]</p>';
-				break;
 			case "multi":
 				placeholder = '例: <p class="item">[TEXT]</p>\n\n※各行が個別のタグとして出力されます';
-				break;
-			case "list":
-				placeholder = "例:\n<ul>\n[TEXT]\n</ul>\n\n※[TEXT]は各行が<li>...</li>に置換されます";
-				break;
-			case "link":
-				placeholder = '例: <a href="[URL]">[TEXT]</a>';
 				break;
 			case "p-list":
 				placeholder = "例:\n<div>\n<p>[TEXT_P_1]</p>\n<p>[TEXT_P_2]</p>\n<ul>\n[TEXT_LIST]\n</ul>\n</div>\n\n※[TEXT_P_1], [TEXT_P_2]...で複数段落、[TEXT_LIST]でリスト項目を配置";
@@ -1382,18 +1367,15 @@ document.addEventListener("DOMContentLoaded", function () {
 
 		let placeholderText = `${tagName}タグ用のテキストエリア`;
 
-		if (tagType === "link") {
-			placeholderText = `${tagName}エリア。1行目: 表示テキスト、2行目: リンクURL`;
+		if (tagType === "multi") {
+			placeholderText = `${tagName}エリア。各行が個別のタグとして出力されます。`;
 		} else if (tagType === "p-list") {
 			placeholderText = `${tagName}エリア。通常の行: 段落、「-」または「*」で始まる行: リスト項目`;
-		} else if (tagType === "single") {
-			placeholderText = `${tagName}エリア。テキストを入力してください。改行は<br>になります。`;
-		} else if (tagType === "multi") {
-			placeholderText = `${tagName}エリア。各行が個別のタグとして出力されます。`;
-		} else if (tagType === "list") {
-			placeholderText = `${tagName}エリア。各行がliタグに変換されます。`;
 		} else if (tagType === "link-list") {
 			placeholderText = `${tagName}エリア。奇数行: リンクテキスト、偶数行: URL を交互に入力`;
+		} else {
+			// 古いモード (single, list, link) のための後方互換性
+			placeholderText = `${tagName}エリア。テキストを入力してください。`;
 		}
 		newTextarea.setAttribute("data-placeholder", placeholderText);
 
