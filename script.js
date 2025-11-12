@@ -138,6 +138,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
 		if (currentPattern && currentPattern.formattingMap) {
 			formattingMap = currentPattern.formattingMap;
+			// 古いパターンから italic と underline を削除
+			delete formattingMap.italic;
+			delete formattingMap.underline;
 		} else {
 			// フォールバック：パターンに書式マッピングがない場合はデフォルトを設定
 			formattingMap = JSON.parse(JSON.stringify(defaultFormattingMap));
@@ -198,6 +201,11 @@ document.addEventListener("DOMContentLoaded", function () {
 		const types = Object.keys(formattingMap);
 
 		types.forEach((type) => {
+			// italic と underline は表示しない
+			if (type === 'italic' || type === 'underline') {
+				return;
+			}
+
 			const formatting = formattingMap[type];
 			const item = document.createElement("div");
 			item.className = "formatting-item";
@@ -267,6 +275,9 @@ document.addEventListener("DOMContentLoaded", function () {
 						delete formatting.tag;
 					}
 				});
+				// 古いパターンから italic と underline を削除
+				delete patterns[id].formattingMap.italic;
+				delete patterns[id].formattingMap.underline;
 			}
 		});
 
