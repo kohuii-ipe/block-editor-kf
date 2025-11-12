@@ -828,6 +828,19 @@ document.addEventListener("DOMContentLoaded", function () {
 		return text.replace(/\n+$/, "");
 	}
 
+	// contenteditable div から改行を保持したプレーンテキストを取得するヘルパー関数
+	// link-list モード用：すべてのHTMLタグを除去し、純粋なテキストのみを抽出
+	function getPlainTextWithLineBreaks(htmlContent) {
+		const tempDiv = document.createElement("div");
+		tempDiv.innerHTML = htmlContent;
+
+		// innerText を使用すると、ブラウザが自動的に<br>やblock要素を改行に変換してくれる
+		let text = tempDiv.innerText || tempDiv.textContent || "";
+
+		// 末尾の余分な改行を削除
+		return text.replace(/\n+$/, "");
+	}
+
 	// HTML出力をクリーンアップする関数（重複タグの統合と空タグの削除）
 	function cleanupHTML(html) {
 		let cleaned = html;
@@ -880,14 +893,16 @@ document.addEventListener("DOMContentLoaded", function () {
 		const htmlContent = textareaElement.innerHTML;
 		if (!htmlContent || htmlContent.trim() === "") return ""; // 空白/空の場合は空文字を返す
 
-		// HTMLから改行を保持したテキストを取得
-		const text = getTextWithLineBreaks(htmlContent);
-
 		const tagId = textareaElement.getAttribute("data-tag-id");
 		const tagInfo = getCustomTagInfo(tagId);
 
 		// タグ情報がない場合は、HTMLコメントとして警告を返す
 		if (!tagInfo) return `<!-- 警告: 不明なタグID (${tagId}) のためスキップされました -->\n`;
+
+		// link-list モードの場合はプレーンテキストを取得、それ以外は書式を保持
+		const text = (tagInfo.tagType === "link-list")
+			? getPlainTextWithLineBreaks(htmlContent)
+			: getTextWithLineBreaks(htmlContent);
 
 		// ★★★
 		// テンプレートが空文字列の場合、警告を返すように修正
@@ -1081,6 +1096,16 @@ document.addEventListener("DOMContentLoaded", function () {
 		// HTMLデータを取得
 		const htmlData = clipboardData.getData("text/html");
 		if (!htmlData) return; // HTMLデータがない場合は通常の貼り付けを許可
+
+		// WordやOfficeアプリからのHTMLかどうかを検出
+		// Word/Office HTMLには特定のマーカーが含まれている
+		const isFromWord = htmlData.includes("urn:schemas-microsoft-com:office") ||
+			htmlData.includes("class=\"Mso") ||
+			htmlData.includes("class='Mso") ||
+			htmlData.match(/<meta\s+name=["']?Generator["']?\s+content=["']?Microsoft/i);
+
+		// Word/Office以外からのHTML（内部コピーなど）の場合は通常の貼り付けを許可
+		if (!isFromWord) return;
 
 		event.preventDefault(); // デフォルトの貼り付けをキャンセル
 
