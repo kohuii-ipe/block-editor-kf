@@ -27,15 +27,6 @@ document.addEventListener("DOMContentLoaded", function () {
 	const linkItemTemplateInput = document.getElementById("linkItemTemplateInput");
 	const closeModalSpan = tagModal.querySelector(".close");
 
-	// ショートカット管理関連
-	const shortcutList = document.getElementById("shortcutList");
-	const addNewShortcutButton = document.getElementById("addNewShortcutButton");
-	const shortcutModal = document.getElementById("shortcutModal");
-	const shortcutModalForm = document.getElementById("shortcutModalForm");
-	const shortcutKeyInput = document.getElementById("shortcutKeyInput");
-	const shortcutTagInput = document.getElementById("shortcutTagInput");
-	const closeShortcutModalSpan = document.getElementById("closeShortcutModal");
-
 	// 書式マッピング管理関連
 	const formattingList = document.getElementById("formattingList");
 
@@ -84,13 +75,6 @@ document.addEventListener("DOMContentLoaded", function () {
 		pattern1: {
 			name: "ソニー (デフォルト)",
 			buttons: JSON.parse(JSON.stringify(defaultTagButtons)), // ディープコピー
-			shortcuts: {
-				B: { tag: "strong", displayName: "Ctrl/Cmd+B" },
-				M: { tag: "mark", displayName: "Ctrl/Cmd+M" },
-				U: { tag: "sup", displayName: "Ctrl/Cmd+U" },
-				L: { tag: "li", displayName: "Ctrl/Cmd+L" },
-				K: { tag: "a", displayName: "Ctrl/Cmd+K" },
-			},
 			formattingMap: JSON.parse(JSON.stringify(defaultFormattingMap)),
 		},
 		pattern2: {
@@ -116,13 +100,6 @@ document.addEventListener("DOMContentLoaded", function () {
 					tagType: "single",
 				},
 			],
-			shortcuts: {
-				B: { tag: "strong", displayName: "Ctrl/Cmd+B" },
-				M: { tag: "mark", displayName: "Ctrl/Cmd+M" },
-				U: { tag: "sup", displayName: "Ctrl/Cmd+U" },
-				L: { tag: "li", displayName: "Ctrl/Cmd+L" },
-				K: { tag: "a", displayName: "Ctrl/Cmd+K" },
-			},
 			formattingMap: JSON.parse(JSON.stringify(defaultFormattingMap)),
 		},
 	};
@@ -132,19 +109,8 @@ document.addEventListener("DOMContentLoaded", function () {
 	// --- 永続化と初期化 ---
 	const STORAGE_KEY = "customTagPatternsV2";
 	const SETTINGS_KEY = "editorSettingsV2";
-	const SHORTCUTS_KEY = "keyboardShortcutsV2";
 	const INPUT_AREAS_KEY = "inputAreasV2";
 
-	// デフォルトのショートカット設定
-	const defaultShortcuts = {
-		B: { tag: "strong", displayName: "Ctrl/Cmd+B" },
-		M: { tag: "mark", displayName: "Ctrl/Cmd+M" },
-		U: { tag: "sup", displayName: "Ctrl/Cmd+U" },
-		L: { tag: "li", displayName: "Ctrl/Cmd+L" },
-		K: { tag: "a", displayName: "Ctrl/Cmd+K" },
-	};
-
-	let keyboardShortcuts = {};
 	let formattingMap = {};
 
 	const saveAllPatterns = () => {
@@ -156,31 +122,6 @@ document.addEventListener("DOMContentLoaded", function () {
 			selectedPattern: selectedId,
 		};
 		localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
-	};
-
-	const saveShortcuts = () => {
-		const patternId = getSelectedPatternId();
-		const currentPattern = patterns[patternId];
-
-		if (currentPattern) {
-			currentPattern.shortcuts = keyboardShortcuts;
-			saveAllPatterns(); // パターン全体を保存
-		}
-	};
-
-	const loadShortcuts = () => {
-		const patternId = getSelectedPatternId();
-		const currentPattern = patterns[patternId];
-
-		if (currentPattern && currentPattern.shortcuts) {
-			keyboardShortcuts = currentPattern.shortcuts;
-		} else {
-			// フォールバック：パターンにショートカットがない場合はデフォルトを設定
-			keyboardShortcuts = JSON.parse(JSON.stringify(defaultShortcuts));
-			if (currentPattern) {
-				currentPattern.shortcuts = keyboardShortcuts;
-			}
-		}
 	};
 
 	const saveFormattingMap = () => {
@@ -250,126 +191,6 @@ document.addEventListener("DOMContentLoaded", function () {
 		}
 	};
 
-	// ショートカット管理UIの構築
-	const buildShortcutUI = () => {
-		const shortcutList = document.getElementById("shortcutList");
-		if (!shortcutList) return;
-
-		shortcutList.innerHTML = "";
-
-		const keys = Object.keys(keyboardShortcuts);
-
-		keys.forEach((key, index) => {
-			const shortcut = keyboardShortcuts[key];
-			const item = document.createElement("div");
-			item.className = "shortcut-item";
-			item.draggable = true;
-			item.dataset.key = key;
-			item.dataset.index = index;
-
-			// ドラッグハンドル
-			const dragHandle = document.createElement("span");
-			dragHandle.textContent = "⋮⋮";
-			dragHandle.style.cursor = "grab";
-			dragHandle.style.marginRight = "8px";
-			dragHandle.style.color = "#999";
-			dragHandle.style.fontSize = "0.9em";
-			dragHandle.title = "ドラッグして順序を変更";
-
-			const label = document.createElement("label");
-			label.textContent = shortcut.displayName;
-
-			const input = document.createElement("input");
-			input.type = "text";
-			input.value = shortcut.tag;
-			input.placeholder = "タグ名を入力 (例: strong, mark, code)";
-
-			input.addEventListener("input", (e) => {
-				keyboardShortcuts[key].tag = e.target.value.trim();
-				saveShortcuts();
-			});
-
-			const deleteButton = document.createElement("button");
-			deleteButton.textContent = "削除";
-			deleteButton.style.color = "red";
-			deleteButton.addEventListener("click", () => {
-				if (confirm(`ショートカット「${shortcut.displayName}」を削除してもよろしいですか？`)) {
-					console.log(`ショートカット「${shortcut.displayName}」を削除しました。`);
-					delete keyboardShortcuts[key];
-					buildShortcutUI();
-					saveShortcuts();
-				}
-			});
-
-			// ドラッグイベント
-			item.addEventListener("dragstart", (e) => {
-				e.dataTransfer.effectAllowed = "move";
-				e.dataTransfer.setData("text/html", e.target.innerHTML);
-				item.classList.add("dragging-shortcut");
-			});
-
-			item.addEventListener("dragend", (e) => {
-				item.classList.remove("dragging-shortcut");
-			});
-
-			item.addEventListener("dragover", (e) => {
-				e.preventDefault();
-				e.dataTransfer.dropEffect = "move";
-
-				const draggingItem = document.querySelector(".dragging-shortcut");
-				if (draggingItem && draggingItem !== item) {
-					const rect = item.getBoundingClientRect();
-					const midpoint = rect.top + rect.height / 2;
-
-					if (e.clientY < midpoint) {
-						item.style.borderTop = "2px solid #4CAF50";
-						item.style.borderBottom = "";
-					} else {
-						item.style.borderTop = "";
-						item.style.borderBottom = "2px solid #4CAF50";
-					}
-				}
-			});
-
-			item.addEventListener("dragleave", (e) => {
-				item.style.borderTop = "";
-				item.style.borderBottom = "";
-			});
-
-			item.addEventListener("drop", (e) => {
-				e.preventDefault();
-				item.style.borderTop = "";
-				item.style.borderBottom = "";
-
-				const draggingItem = document.querySelector(".dragging-shortcut");
-				if (!draggingItem || draggingItem === item) return;
-
-				const fromIndex = parseInt(draggingItem.dataset.index);
-				const toIndex = parseInt(item.dataset.index);
-
-				// オブジェクトを配列に変換して並び替え
-				const entries = Object.entries(keyboardShortcuts);
-				const [movedEntry] = entries.splice(fromIndex, 1);
-				entries.splice(toIndex, 0, movedEntry);
-
-				// 新しいオブジェクトを再構築
-				keyboardShortcuts = {};
-				entries.forEach(([k, v]) => {
-					keyboardShortcuts[k] = v;
-				});
-
-				buildShortcutUI();
-				saveShortcuts();
-			});
-
-			item.appendChild(dragHandle);
-			item.appendChild(label);
-			item.appendChild(input);
-			item.appendChild(deleteButton);
-			shortcutList.appendChild(item);
-		});
-	};
-
 	// 書式マッピング管理UIの構築
 	const buildFormattingUI = () => {
 		if (!formattingList) return;
@@ -381,7 +202,7 @@ document.addEventListener("DOMContentLoaded", function () {
 		types.forEach((type) => {
 			const formatting = formattingMap[type];
 			const item = document.createElement("div");
-			item.className = "shortcut-item"; // 同じスタイルを使用
+			item.className = "formatting-item";
 
 			const label = document.createElement("label");
 			label.textContent = formatting.displayName;
@@ -434,10 +255,6 @@ document.addEventListener("DOMContentLoaded", function () {
 					}
 				}
 			});
-			// 後方互換性：ショートカットがない古いパターンにデフォルトショートカットを追加
-			if (!patterns[id].shortcuts) {
-				patterns[id].shortcuts = JSON.parse(JSON.stringify(defaultShortcuts));
-			}
 			// 後方互換性：書式マッピングがない古いパターンにデフォルト書式マッピングを追加
 			if (!patterns[id].formattingMap) {
 				patterns[id].formattingMap = JSON.parse(JSON.stringify(defaultFormattingMap));
@@ -497,8 +314,6 @@ document.addEventListener("DOMContentLoaded", function () {
 			input.addEventListener("change", () => {
 				rebuildTagButtons(); // パターン切り替え時、ボタンを再生成
 				rebuildTagButtonList(); // タグボタン管理一覧を更新
-				loadShortcuts(); // ショートカットを再読み込み
-				buildShortcutUI(); // ショートカットUIを再構築
 				loadFormattingMap(); // 書式マッピングを再読み込み
 				buildFormattingUI(); // 書式マッピングUIを再構築
 				saveAllPatterns();
@@ -571,8 +386,6 @@ document.addEventListener("DOMContentLoaded", function () {
 					}))
 				)
 			),
-			// ショートカットもコピー
-			shortcuts: JSON.parse(JSON.stringify(sourcePattern.shortcuts || defaultShortcuts)),
 			// 書式マッピングもコピー
 			formattingMap: JSON.parse(JSON.stringify(sourcePattern.formattingMap || defaultFormattingMap)),
 		};
@@ -580,8 +393,6 @@ document.addEventListener("DOMContentLoaded", function () {
 		rebuildPatternUI(newId);
 		rebuildTagButtons();
 		rebuildTagButtonList();
-		loadShortcuts(); // 新しいパターンのショートカットを読み込み
-		buildShortcutUI(); // ショートカットUIを再構築
 		loadFormattingMap(); // 新しいパターンの書式マッピングを読み込み
 		buildFormattingUI(); // 書式マッピングUIを再構築
 		saveAllPatterns();
@@ -618,8 +429,6 @@ document.addEventListener("DOMContentLoaded", function () {
 			rebuildPatternUI(firstId);
 			rebuildTagButtons();
 			rebuildTagButtonList();
-			loadShortcuts(); // 新しいパターンのショートカットを読み込み
-			buildShortcutUI(); // ショートカットUIを再構築
 			loadFormattingMap(); // 新しいパターンの書式マッピングを読み込み
 			buildFormattingUI(); // 書式マッピングUIを再構築
 			saveAllPatterns();
@@ -668,56 +477,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
 	// 「新しいタグボタンを追加」ボタン
 	addNewTagButton.addEventListener("click", () => openTagModal());
-
-	// --- ショートカット追加機能 ---
-
-	// ショートカットモーダルを開く
-	addNewShortcutButton.addEventListener("click", () => {
-		shortcutModal.style.display = "block";
-		shortcutKeyInput.value = "";
-		shortcutTagInput.value = "";
-	});
-
-	// ショートカットモーダルを閉じる
-	closeShortcutModalSpan.onclick = function () {
-		shortcutModal.style.display = "none";
-	};
-
-	// ショートカット追加フォームの送信
-	shortcutModalForm.addEventListener("submit", (e) => {
-		e.preventDefault();
-
-		const key = shortcutKeyInput.value.trim().toUpperCase();
-		const tag = shortcutTagInput.value.trim();
-
-		// バリデーション
-		if (!/^[A-Z]$/.test(key)) {
-			alert("A-Zの英字1文字を入力してください。");
-			return;
-		}
-
-		if (!tag) {
-			alert("タグ名を入力してください。");
-			return;
-		}
-
-		// 既存のショートカットがある場合は上書き確認
-		if (keyboardShortcuts[key]) {
-			if (!confirm(`Ctrl/Cmd+${key} は既に使用されています。上書きしますか？`)) {
-				return;
-			}
-		}
-
-		// ショートカットを追加
-		keyboardShortcuts[key] = {
-			tag: tag,
-			displayName: `Ctrl/Cmd+${key}`,
-		};
-
-		shortcutModal.style.display = "none";
-		buildShortcutUI();
-		saveShortcuts();
-	});
 
 	// ★★★ ここから修正箇所 ★★★
 
@@ -1019,19 +778,25 @@ document.addEventListener("DOMContentLoaded", function () {
 
 				// block 要素は改行で区切る
 				const isBlock = ["div", "p"].includes(tagName);
-				// formatting タグは保持
-				const isFormatting = ["strong", "mark", "b", "em", "u", "span"].includes(tagName);
+				// formatting タグは保持（リンクも含む）
+				const isFormatting = ["strong", "mark", "b", "em", "u", "span", "a"].includes(tagName);
 
 				let result = "";
 
 				// formatting タグの開始タグを追加（属性も含めて）
 				if (isFormatting) {
 					let openTag = `<${tagName}`;
-					// 属性があれば追加
+					// 属性があれば追加（不要な属性は除外）
 					if (node.attributes && node.attributes.length > 0) {
+						// リンクの場合は href のみ保持
+						const allowedAttrs = tagName === "a" ? ["href"] : ["class", "id", "style"];
+
 						for (let i = 0; i < node.attributes.length; i++) {
 							const attr = node.attributes[i];
-							openTag += ` ${attr.name}="${attr.value}"`;
+							// data- で始まる属性や許可されていない属性を除外
+							if (allowedAttrs.includes(attr.name) && !attr.name.startsWith("data-")) {
+								openTag += ` ${attr.name}="${attr.value}"`;
+							}
 						}
 					}
 					openTag += `>`;
@@ -1066,6 +831,53 @@ document.addEventListener("DOMContentLoaded", function () {
 
 		// 末尾の余分な改行を削除
 		return text.replace(/\n+$/, "");
+	}
+
+	// HTML出力をクリーンアップする関数（重複タグの統合と空タグの削除）
+	function cleanupHTML(html) {
+		let cleaned = html;
+
+		// 0. 視覚効果用の data-highlight 属性を削除
+		cleaned = cleaned.replace(/\s*data-highlight="true"/g, '');
+
+		// 1. 連続する同じタグを統合（例: </strong><strong> を削除）
+		const tagsToMerge = ['strong', 'mark', 'b', 'em', 'u', 'span', 'i'];
+		tagsToMerge.forEach(tag => {
+			// </tag><tag> パターンを削除（属性なしの場合）
+			const pattern = new RegExp(`</${tag}><${tag}>`, 'g');
+			cleaned = cleaned.replace(pattern, '');
+
+			// 属性付きの場合も対応（同じ属性の連続タグを統合）
+			// 例: </strong><strong class="x"> の場合は統合しない（属性が異なる可能性）
+		});
+
+		// 2. 空のタグを削除（例: <strong></strong>）
+		const allTags = ['strong', 'mark', 'b', 'em', 'u', 'span', 'i', 'a', 'p', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'];
+		allTags.forEach(tag => {
+			// 属性なしの空タグ
+			const emptyPattern = new RegExp(`<${tag}></${tag}>`, 'g');
+			cleaned = cleaned.replace(emptyPattern, '');
+
+			// 属性付きの空タグ（スペースや改行のみを含む場合も）
+			const emptyWithAttrsPattern = new RegExp(`<${tag}[^>]*>\\s*</${tag}>`, 'g');
+			cleaned = cleaned.replace(emptyWithAttrsPattern, '');
+		});
+
+		// 複数回実行して、入れ子の空タグも削除
+		let previousCleaned = '';
+		let iterations = 0;
+		while (previousCleaned !== cleaned && iterations < 5) {
+			previousCleaned = cleaned;
+			allTags.forEach(tag => {
+				const emptyPattern = new RegExp(`<${tag}></${tag}>`, 'g');
+				cleaned = cleaned.replace(emptyPattern, '');
+				const emptyWithAttrsPattern = new RegExp(`<${tag}[^>]*>\\s*</${tag}>`, 'g');
+				cleaned = cleaned.replace(emptyWithAttrsPattern, '');
+			});
+			iterations++;
+		}
+
+		return cleaned;
 	}
 
 	// 共通の変換ロジック (タグタイプに応じて処理を振り分けるように変更)
@@ -1215,6 +1027,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
 			output = templateString.replace(/\[LINK_LIST\]/g, linkListContent.trim());
 		}
+
+		// HTML出力をクリーンアップ（重複タグの統合と空タグの削除）
+		output = cleanupHTML(output);
 
 		// 最後に改行を加えておく (追記時に扱いやすいように)
 		return output + "\n";
@@ -1395,7 +1210,7 @@ document.addEventListener("DOMContentLoaded", function () {
 				}
 
 				// Word/ブラウザの書式タグをカスタムタグにマッピング
-				// 太字とマーカーのみを保持し、他の書式は無視する
+				// 太字、マーカー、リンクを保持し、他の書式は無視する
 				if ((tagName === "b" || tagName === "strong") && formattingMap.bold) {
 					// テンプレートから開始タグと終了タグを抽出（後方互換性のため tag もサポート）
 					if (formattingMap.bold.template) {
@@ -1411,11 +1226,19 @@ document.addEventListener("DOMContentLoaded", function () {
 					// Word のハイライトは span の background-color として来ることがある
 					if (formattingMap.highlight.template) {
 						const tags = extractTagsFromTemplate(formattingMap.highlight.template);
-						openTag = tags.openTag;
+						// data-highlight 属性を追加して視覚効果を統一
+						openTag = tags.openTag.replace(/>$/, ' data-highlight="true">');
 						closeTag = tags.closeTag;
 					} else if (formattingMap.highlight.tag) {
-						openTag = `<${formattingMap.highlight.tag}>`;
+						openTag = `<${formattingMap.highlight.tag} data-highlight="true">`;
 						closeTag = `</${formattingMap.highlight.tag}>`;
+					}
+				} else if (tagName === "a") {
+					// リンクタグを保持（href属性を含む）
+					const href = node.getAttribute("href");
+					if (href) {
+						openTag = `<a href="${href}">`;
+						closeTag = `</a>`;
 					}
 				}
 				// 斜体、下線などの他の書式は無視（タグを付けずに子ノードのみ処理）
@@ -1601,8 +1424,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
 	// --- ページ初期化 ---
 	loadAllPatterns();
-	loadShortcuts();
-	buildShortcutUI(); // ショートカット管理UIを初期表示
 	loadFormattingMap();
 	buildFormattingUI(); // 書式マッピング管理UIを初期表示
 	rebuildTagButtonList(); // タグボタン管理一覧を初期表示
@@ -1650,23 +1471,6 @@ document.addEventListener("DOMContentLoaded", function () {
 		textarea.selectionEnd = newCursorPos;
 		textarea.focus();
 	};
-
-	// キーボードショートカットイベントリスナー (カスタマイズ対応版)
-	document.addEventListener("keydown", function (event) {
-		const isModifierKey = event.ctrlKey || event.metaKey;
-		if (isModifierKey) {
-			const key = event.key.toUpperCase();
-
-			// カスタマイズされたショートカット設定を使用
-			if (keyboardShortcuts[key]) {
-				const tagName = keyboardShortcuts[key].tag;
-				if (tagName) {
-					event.preventDefault();
-					window.wrapSelectionWithTag(tagName);
-				}
-			}
-		}
-	});
 
 	// 出力エリアクリア機能 (変更なし)
 	if (clearOutputButton) {

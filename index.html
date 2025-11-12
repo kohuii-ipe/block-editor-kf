@@ -3,10 +3,15 @@
 	<head>
 		<meta charset="UTF-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-		<title>タグカスタマイズ変換エディタ (カスタムタグ対応)</title>
+		<title>block-editor-kf</title>
 		<link rel="stylesheet" href="style.css">
 	</head>
 	<body>
+		<!-- タイトルバナー -->
+		<header class="title-banner">
+			<h1>block-editor-kf</h1>
+		</header>
+
 		<!-- 変換パターン設定エリア -->
 		<h2>変換パターン設定</h2>
 
@@ -32,20 +37,6 @@
 			<button id="addNewTagButton">➕ 新しいタグボタンを追加</button>
 			<div id="tagButtonList">
 				<!-- 既存のタグボタンがJSでここに表示されます -->
-			</div>
-		</div>
-
-		<hr />
-
-		<!-- ショートカットキー管理エリア -->
-		<h2>ショートカットキー管理</h2>
-		<div id="shortcutManagement">
-			<p style="font-size: 0.9em; margin-bottom: 10px">
-				※テキスト選択時に使えるショートカットキーをカスタマイズします。
-			</p>
-			<button id="addNewShortcutButton">➕ 新しいショートカットを追加</button>
-			<div id="shortcutList">
-				<!-- ショートカット設定がJSでここに表示されます -->
 			</div>
 		</div>
 
@@ -145,28 +136,6 @@
 			</div>
 		</div>
 
-		<!-- ショートカット追加モーダル -->
-		<div id="shortcutModal" class="modal">
-			<div class="modal-content">
-				<span class="close" id="closeShortcutModal">&times;</span>
-				<h3>新しいショートカットキーの追加</h3>
-				<form id="shortcutModalForm">
-					<label for="shortcutKeyInput">キー (A-Z の1文字)</label>
-					<input type="text" id="shortcutKeyInput" maxlength="1" required placeholder="例: G, I, Pなど" />
-					<p style="font-size: 0.85em; color: #666">
-						※Ctrl/Cmd と組み合わせて使用します。A-Zの英字1文字を入力してください。
-					</p>
-
-					<label for="shortcutTagInput">タグ名</label>
-					<input type="text" id="shortcutTagInput" required placeholder="例: code, span, div" />
-					<p style="font-size: 0.85em; color: #666">
-						※選択テキストを囲むHTMLタグ名を入力してください。
-					</p>
-
-					<button type="submit">追加</button>
-				</form>
-			</div>
-		</div>
 	</body>
 	<script src="script.js"></script>
 </html>

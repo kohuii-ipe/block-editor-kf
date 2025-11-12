@@ -1,3 +1,20 @@
+/* タイトルバナー（ミニマリストスタイル） */
+.title-banner {
+	background-color: #2c3e50;
+	color: #ecf0f1;
+	padding: 20px 0;
+	margin: -20px -20px 30px -20px;
+	text-align: center;
+}
+
+.title-banner h1 {
+	margin: 0;
+	font-size: 1.8em;
+	font-weight: 300;
+	letter-spacing: 2px;
+	text-transform: lowercase;
+}
+
 /* サイト全体の幅を1200pxに固定し、中央寄せにする */
 body {
 	max-width: 1200px;
@@ -88,6 +105,25 @@ body {
 	background-color: yellow;
 	color: black;
 	padding: 0 2px;
+}
+
+/* 入力エリア内のハイライト属性を持つすべての要素を黄色ハイライト表示 */
+.input-text-area [data-highlight="true"] {
+	background-color: yellow;
+	color: black;
+	padding: 0 2px;
+}
+
+/* 入力エリア内のリンクをスタイル表示 */
+.input-text-area a {
+	color: #0066cc;
+	text-decoration: underline;
+	cursor: pointer;
+}
+
+.input-text-area a:hover {
+	color: #0052a3;
+	background-color: #f0f8ff;
 }
 
 /* contenteditable div のプレースホルダー表示 */
@@ -186,13 +222,6 @@ body {
 	border: 1px solid #ddd;
 	background-color: white;
 }
-/* --- ショートカット管理エリア --- */
-#shortcutManagement {
-	border: 1px solid #ccc;
-	padding: 10px;
-	margin-bottom: 15px;
-	background-color: #f5f5f5;
-}
 /* --- 書式マッピング管理エリア --- */
 #formattingManagement {
 	border: 1px solid #ccc;
@@ -208,38 +237,22 @@ body {
 	border: 1px solid #ddd;
 	background-color: white;
 }
-#shortcutManagement button {
-	margin-bottom: 10px;
-}
-#shortcutList {
-	max-height: 300px;
-	overflow-y: auto;
-	margin-top: 10px;
-	padding: 5px;
-	border: 1px solid #ddd;
-	background-color: white;
-}
-.shortcut-item {
+.formatting-item {
 	display: flex;
 	align-items: center;
 	padding: 5px;
 	border-bottom: 1px dotted #eee;
-	cursor: move;
 	transition: background-color 0.2s;
 }
-.shortcut-item:last-child {
+.formatting-item:last-child {
 	border-bottom: none;
 }
-.shortcut-item.dragging-shortcut {
-	opacity: 0.5;
-	background-color: #e3f2fd;
-}
-.shortcut-item:hover {
+.formatting-item:hover {
 	background-color: #f5f5f5;
 }
-.shortcut-item label {
+.formatting-item label {
 	flex-shrink: 0;
-	width: 100px;
+	width: 150px;
 	font-weight: bold;
 	font-size: 0.9em;
 	margin-right: 8px;
@@ -247,19 +260,12 @@ body {
 	text-overflow: ellipsis;
 	white-space: nowrap;
 }
-.shortcut-item select,
-.shortcut-item input[type="text"] {
+.formatting-item input[type="text"] {
 	flex-grow: 1;
 	padding: 5px;
 	border: 1px solid #ccc;
 	border-radius: 4px;
 	font-size: 1em;
-}
-.shortcut-item button {
-	flex-shrink: 0;
-	margin-left: 8px;
-	padding: 5px 8px;
-	font-size: 0.85em;
 }
 /* モバイル対応 */
 @media (max-width: 768px) {
@@ -267,27 +273,19 @@ body {
 		padding: 10px;
 		font-size: 14px;
 	}
-	.shortcut-item {
+	.formatting-item {
 		padding: 5px;
 	}
-	.shortcut-item label {
-		width: 70px;
+	.formatting-item label {
+		width: 80px;
 		font-size: 0.75em;
 		margin-right: 4px;
 		line-height: 1.2;
 	}
-	.shortcut-item input[type="text"] {
+	.formatting-item input[type="text"] {
 		padding: 4px;
 		font-size: 0.85em;
 		min-width: 0;
-	}
-	.shortcut-item button {
-		margin-left: 4px;
-		padding: 4px 6px;
-		font-size: 0.75em;
-	}
-	#shortcutManagement {
-		padding: 8px;
 	}
 }
 .tag-item {
@@ -350,16 +348,14 @@ body {
 	text-decoration: none;
 	cursor: pointer;
 }
-#tagModalForm label,
-#shortcutModalForm label {
+#tagModalForm label {
 	display: block;
 	margin-top: 10px;
 	font-weight: bold;
 }
 #tagModalForm input[type="text"],
 #tagModalForm select,
-#tagModalForm textarea,
-#shortcutModalForm input[type="text"] {
+#tagModalForm textarea {
 	width: 95%;
 	padding: 8px;
 	margin: 5px 0 15px 0;
@@ -367,14 +363,6 @@ body {
 	border: 1px solid #ccc;
 	border-radius: 4px;
 	box-sizing: border-box;
-}
-#shortcutModalForm button[type="submit"] {
-	margin-top: 10px;
-}
-#shortcutModalForm p {
-	margin-top: 0;
-	margin-bottom: 15px;
-	line-height: 1.4;
 }
 
 /* 出力エリアのスタイル */
