@@ -104,11 +104,9 @@
 
 					<label for="tagTypeSelector">タグタイプ (動作モード)</label>
 					<select id="tagTypeSelector">
-						<option value="multi">[TEXT]置換 (各行が個別のタグに)</option>
-						<option value="p-list">[TEXT_P]と[TEXT_LIST]置換 (P+UL/OL系。複数行入力)</option>
-						<option value="link-list">
-							[TEXT]と[URL]で繰り返し (複数リンクのリスト。交互に入力)
-						</option>
+						<option value="multi">マルチラインモード - 各行が個別のタグに変換</option>
+						<option value="p-list">段落+リストモード - テキストと箇条書きの組み合わせ</option>
+						<option value="link-list">リンクリストモード - 複数のリンクをリスト化</option>
 					</select>
 					<p style="font-size: 0.8em; color: #666; margin-top: -10px">
 						※入力エリアの動作（複数行の扱い、URLの取得など）を決定します。

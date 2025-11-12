@@ -44,7 +44,8 @@ document.addEventListener("DOMContentLoaded", function () {
 	};
 
 	const defaultTagButtons = [
-		// id, name, template, tagType (multi, p-list, link-list)
+		// id, name, template, tagType
+		// tagType: multi (マルチラインモード), p-list (段落+リストモード), link-list (リンクリストモード)
 		{ id: "p", name: "pタグ", template: "<p>[TEXT]</p>", tagType: "multi" },
 		{ id: "h2", name: "h2タグ", template: "<h2>[TEXT]</h2>", tagType: "multi" },
 		{ id: "box", name: "枠", template: '<div class="box">[TEXT]</div>', tagType: "multi" },
@@ -497,13 +498,13 @@ document.addEventListener("DOMContentLoaded", function () {
 
 		switch (selectedType) {
 			case "multi":
-				placeholder = '例: <p class="item">[TEXT]</p>\n\n※各行が個別のタグとして出力されます';
+				placeholder = '例: <p class="item">[TEXT]</p>\n\n【マルチラインモード】\n※各行がそれぞれ個別のタグとして出力されます\n※[TEXT]が各行のテキストに置き換わります';
 				break;
 			case "p-list":
-				placeholder = "例:\n<div>\n<p>[TEXT_P_1]</p>\n<p>[TEXT_P_2]</p>\n<ul>\n[TEXT_LIST]\n</ul>\n</div>\n\n※[TEXT_P_1], [TEXT_P_2]...で複数段落、[TEXT_LIST]でリスト項目を配置";
+				placeholder = '例:\n<div>\n<p>[TEXT_P_1]</p>\n<p>[TEXT_P_2]</p>\n<ul>\n[TEXT_LIST]\n</ul>\n</div>\n\n【段落+リストモード】\n※通常の行: [TEXT_P_1], [TEXT_P_2]として段落に変換\n※「-」または「*」で始まる行: [TEXT_LIST]として箇条書きに変換';
 				break;
 			case "link-list":
-				placeholder = '例:\n<div class="wrapper">\n<ul>\n[LINK_LIST]\n</ul>\n</div>\n\n※[LINK_LIST]の位置に繰り返されるリンク項目が挿入されます';
+				placeholder = '例:\n<div class="wrapper">\n<ul>\n[LINK_LIST]\n</ul>\n</div>\n\n【リンクリストモード】\n※[LINK_LIST]の位置に複数のリンク項目が挿入されます\n※下の「リンク項目の雛形」で各リンクの形式を指定します';
 				break;
 			default:
 				placeholder = "[TEXT] を使って雛形を入力";
@@ -1368,11 +1369,11 @@ document.addEventListener("DOMContentLoaded", function () {
 		let placeholderText = `${tagName}タグ用のテキストエリア`;
 
 		if (tagType === "multi") {
-			placeholderText = `${tagName}エリア。各行が個別のタグとして出力されます。`;
+			placeholderText = `【${tagName}】マルチラインモード：各行が個別のタグになります`;
 		} else if (tagType === "p-list") {
-			placeholderText = `${tagName}エリア。通常の行: 段落、「-」または「*」で始まる行: リスト項目`;
+			placeholderText = `【${tagName}】段落+リストモード：通常の行は段落、「-」または「*」で始まる行はリスト項目になります`;
 		} else if (tagType === "link-list") {
-			placeholderText = `${tagName}エリア。奇数行: リンクテキスト、偶数行: URL を交互に入力`;
+			placeholderText = `【${tagName}】リンクリストモード：奇数行にリンクテキスト、偶数行にURLを交互に入力してください`;
 		} else {
 			// 古いモード (single, list, link) のための後方互換性
 			placeholderText = `${tagName}エリア。テキストを入力してください。`;
