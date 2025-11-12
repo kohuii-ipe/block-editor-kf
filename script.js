@@ -40,8 +40,6 @@ document.addEventListener("DOMContentLoaded", function () {
 	// デフォルトの書式マッピング設定（Word貼り付け用）
 	const defaultFormattingMap = {
 		bold: { template: "<strong>[TEXT]</strong>", displayName: "太字 (Bold)" },
-		italic: { template: "<em>[TEXT]</em>", displayName: "斜体 (Italic)" },
-		underline: { template: "<u>[TEXT]</u>", displayName: "下線 (Underline)" },
 		highlight: { template: "<mark>[TEXT]</mark>", displayName: "ハイライト (Highlight)" },
 	};
 
