@@ -445,6 +445,7 @@ document.addEventListener("DOMContentLoaded", function () {
 			name: "ソニー (デフォルト)",
 			buttons: JSON.parse(JSON.stringify(defaultTagButtons)), // ディープコピー
 			formattingMap: JSON.parse(JSON.stringify(defaultFormattingMap)),
+			inputAreas: [], // 各パターンごとに入力エリアを保持
 		},
 		pattern2: {
 			name: "カスタム例",
@@ -470,6 +471,7 @@ document.addEventListener("DOMContentLoaded", function () {
 				},
 			],
 			formattingMap: JSON.parse(JSON.stringify(defaultFormattingMap)),
+			inputAreas: [], // 各パターンごとに入力エリアを保持
 		},
 	};
 
@@ -558,15 +560,23 @@ document.addEventListener("DOMContentLoaded", function () {
 				}
 			});
 
-			const dataToSave = JSON.stringify(areas);
+			// 現在のパターンに入力エリアを保存
+			const patternId = getSelectedPatternId();
+			const currentPattern = patterns[patternId];
+			if (currentPattern) {
+				currentPattern.inputAreas = areas;
+			}
+
+			// パターン全体を保存
+			const dataToSave = JSON.stringify(patterns);
 			const dataSize = new Blob([dataToSave]).size;
 
 			if (dataSize > CONSTANTS.MAX_STORAGE_SIZE) {
-				console.warn('入力エリアのデータが大きすぎます:', dataSize, 'bytes');
+				console.warn('パターンデータが大きすぎます:', dataSize, 'bytes');
 				// 警告のみで、保存を試みる（古いデータを保持するため）
 			}
 
-			localStorage.setItem(CONSTANTS.STORAGE_KEYS.INPUT_AREAS, dataToSave);
+			localStorage.setItem(CONSTANTS.STORAGE_KEYS.PATTERNS, dataToSave);
 		} catch (error) {
 			console.error('入力エリアの保存に失敗しました:', error);
 
@@ -584,18 +594,33 @@ document.addEventListener("DOMContentLoaded", function () {
 
 	const loadInputAreas = () => {
 		try {
-			const saved = localStorage.getItem(CONSTANTS.STORAGE_KEYS.INPUT_AREAS);
-			if (!saved) return;
+			// 現在のパターンから入力エリアを読み込む
+			const patternId = getSelectedPatternId();
+			const currentPattern = patterns[patternId];
+
+			if (!currentPattern || !currentPattern.inputAreas) {
+				return;
+			}
 
 			try {
 				isLoadingInputAreas = true; // 読み込み開始
-				const areas = JSON.parse(saved);
+				const areas = currentPattern.inputAreas;
 
 				if (!Array.isArray(areas)) {
 					console.error('入力エリアのデータ形式が不正です');
 					return;
 				}
 
+				// 既存の入力エリアをクリア
+				while (container.firstChild) {
+					const child = container.firstChild;
+					if (child._cleanup) {
+						child._cleanup();
+					}
+					container.removeChild(child);
+				}
+
+				// 入力エリアを復元
 				areas.forEach((area) => {
 					try {
 						const tagInfo = getCustomTagInfo(area.tagId);
@@ -748,6 +773,10 @@ document.addEventListener("DOMContentLoaded", function () {
 				delete patterns[id].formattingMap.italic;
 				delete patterns[id].formattingMap.underline;
 			}
+			// 後方互換性：入力エリアがない古いパターンに空の配列を追加
+			if (!patterns[id].inputAreas) {
+				patterns[id].inputAreas = [];
+			}
 		});
 
 		let initialSelectedPattern = "pattern1";
@@ -765,6 +794,26 @@ document.addEventListener("DOMContentLoaded", function () {
 		} catch (error) {
 			console.warn('設定の読み込みに失敗しました:', error);
 			initialSelectedPattern = "pattern1";
+		}
+
+		// 後方互換性：古いグローバル入力エリアを現在のパターンに移行
+		try {
+			const oldInputAreas = localStorage.getItem(CONSTANTS.STORAGE_KEYS.INPUT_AREAS);
+			if (oldInputAreas) {
+				const areas = JSON.parse(oldInputAreas);
+				if (Array.isArray(areas) && areas.length > 0) {
+					// 選択されたパターンに入力エリアがない場合のみ移行
+					const currentPattern = patterns[initialSelectedPattern];
+					if (currentPattern && (!currentPattern.inputAreas || currentPattern.inputAreas.length === 0)) {
+						currentPattern.inputAreas = areas;
+						console.log('古い入力エリアを現在のパターンに移行しました');
+					}
+				}
+				// 古いストレージキーを削除
+				localStorage.removeItem(CONSTANTS.STORAGE_KEYS.INPUT_AREAS);
+			}
+		} catch (migrationError) {
+			console.warn('入力エリアの移行に失敗しました:', migrationError);
 		}
 
 		rebuildPatternUI(initialSelectedPattern);
@@ -810,10 +859,13 @@ document.addEventListener("DOMContentLoaded", function () {
 			input.id = id;
 			input.value = id;
 			input.addEventListener("change", () => {
+				saveInputAreas(); // 現在のパターンの入力エリアを保存してから切り替え
 				rebuildTagButtons(); // パターン切り替え時、ボタンを再生成
 				rebuildTagButtonList(); // タグボタン管理一覧を更新
 				loadFormattingMap(); // 書式マッピングを再読み込み
 				buildFormattingUI(); // 書式マッピングUIを再構築
+				loadInputAreas(); // 新しいパターンの入力エリアを読み込み
+				updateInsertionPoints(); // 挿入位置セレクタを更新
 				saveAllPatterns();
 			});
 
@@ -870,25 +922,15 @@ document.addEventListener("DOMContentLoaded", function () {
 
 		const newName = `新しいパターン ${nameNumber}`;
 
-		// 既存のパターンのボタン定義をディープコピー（テンプレートもそのままコピー）
-		const sourcePattern = patterns[getSelectedPatternId()] || patterns[Object.keys(patterns)[0]];
-
+		// 新しいパターンはデフォルト設定で開始
 		patterns[newId] = {
 			name: newName,
-			// テンプレート(template)もそのままコピーするように修正
-			buttons: JSON.parse(
-				JSON.stringify(
-					sourcePattern.buttons.map((b) => ({
-						id: b.id,
-						name: b.name,
-						template: b.template, // 修正: '' ではなく b.template をコピー
-						tagType: b.tagType,
-						linkItemTemplate: b.linkItemTemplate || "", // linkItemTemplateもコピー
-					}))
-				)
-			),
-			// 書式マッピングもコピー
-			formattingMap: JSON.parse(JSON.stringify(sourcePattern.formattingMap || defaultFormattingMap)),
+			// デフォルトのタグボタンを使用
+			buttons: JSON.parse(JSON.stringify(defaultTagButtons)),
+			// デフォルトの書式マッピングを使用
+			formattingMap: JSON.parse(JSON.stringify(defaultFormattingMap)),
+			// 入力エリアは空で開始（パターンごとに独立）
+			inputAreas: [],
 		};
 
 		rebuildPatternUI(newId);
@@ -896,6 +938,8 @@ document.addEventListener("DOMContentLoaded", function () {
 		rebuildTagButtonList();
 		loadFormattingMap(); // 新しいパターンの書式マッピングを読み込み
 		buildFormattingUI(); // 書式マッピングUIを再構築
+		loadInputAreas(); // 新しいパターンの入力エリアを読み込み（空）
+		updateInsertionPoints(); // 挿入位置セレクタを更新
 		saveAllPatterns();
 	});
 
@@ -930,6 +974,8 @@ document.addEventListener("DOMContentLoaded", function () {
 			rebuildTagButtonList();
 			loadFormattingMap(); // 新しいパターンの書式マッピングを読み込み
 			buildFormattingUI(); // 書式マッピングUIを再構築
+			loadInputAreas(); // 削除後、残ったパターンの入力エリアを読み込み
+			updateInsertionPoints(); // 挿入位置セレクタを更新
 			saveAllPatterns();
 		}
 	});
