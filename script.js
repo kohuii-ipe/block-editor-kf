@@ -56,6 +56,8 @@ document.addEventListener("DOMContentLoaded", function () {
 		tagTemplateInput: document.getElementById("tagTemplateInput"),
 		linkItemTemplateSection: document.getElementById("linkItemTemplateSection"),
 		linkItemTemplateInput: document.getElementById("linkItemTemplateInput"),
+		listItemTemplateSection: document.getElementById("listItemTemplateSection"),
+		listItemTemplateInput: document.getElementById("listItemTemplateInput"),
 		removeLastBrInput: document.getElementById("removeLastBrInput"),
 		closeModalSpan: null, // 後で初期化
 
@@ -74,6 +76,7 @@ document.addEventListener("DOMContentLoaded", function () {
 		tagButtonsContainer, addNewTagButton, tagButtonList, tagModal,
 		modalTitle, tagModalForm, tagIdInput, tagNameInput, tagTypeSelector,
 		tagTemplateInput, linkItemTemplateSection, linkItemTemplateInput,
+		listItemTemplateSection, listItemTemplateInput,
 		removeLastBrInput, closeModalSpan, formattingList
 	} = DOM;
 
@@ -430,6 +433,7 @@ document.addEventListener("DOMContentLoaded", function () {
 			name: "箇条書きリスト",
 			template: '<div class="box"><p>[TEXT_P_1]</p><p>[TEXT_P_2]</p><ul>\n[TEXT_LIST]\n</ul></div>',
 			tagType: "p-list",
+			listItemTemplate: '<li>[TEXT]</li>',
 		},
 		{
 			id: "link-list-sample",
@@ -777,6 +781,12 @@ document.addEventListener("DOMContentLoaded", function () {
 			if (!patterns[id].inputAreas) {
 				patterns[id].inputAreas = [];
 			}
+			// 後方互換性：p-listモードのボタンにlistItemTemplateがない場合はデフォルトを追加
+			patterns[id].buttons.forEach((button) => {
+				if (button.tagType === 'p-list' && !button.listItemTemplate) {
+					button.listItemTemplate = '<li>[TEXT]</li>';
+				}
+			});
 		});
 
 		let initialSelectedPattern = "pattern1";
@@ -1005,6 +1015,7 @@ document.addEventListener("DOMContentLoaded", function () {
 			tagTypeSelector.value = button.tagType;
 			tagTemplateInput.value = button.template;
 			linkItemTemplateInput.value = button.linkItemTemplate || '<li class="rtoc-item"><a href="[URL]">[TEXT]</a></li>';
+			listItemTemplateInput.value = button.listItemTemplate || '<li>[TEXT]</li>';
 			removeLastBrInput.checked = button.removeLastBr || false;
 		} else {
 			// 新規追加モード
@@ -1014,6 +1025,7 @@ document.addEventListener("DOMContentLoaded", function () {
 			tagTypeSelector.value = "single";
 			tagTemplateInput.value = "";
 			linkItemTemplateInput.value = '<li class="rtoc-item"><a href="[URL]">[TEXT]</a></li>';
+			listItemTemplateInput.value = '<li>[TEXT]</li>';
 			removeLastBrInput.checked = false;
 		}
 
@@ -1051,6 +1063,13 @@ document.addEventListener("DOMContentLoaded", function () {
 			linkItemTemplateSection.style.display = "none";
 		}
 
+		// p-list用のフィールドの表示/非表示を切り替え
+		if (selectedType === "p-list") {
+			listItemTemplateSection.style.display = "block";
+		} else {
+			listItemTemplateSection.style.display = "none";
+		}
+
 		switch (selectedType) {
 			case "multi":
 				placeholder = '例: <p class="item">[TEXT]</p>\n\n【マルチラインモード】\n※各行がそれぞれ個別のタグとして出力されます\n※[TEXT]が各行のテキストに置き換わります';
@@ -1086,6 +1105,7 @@ document.addEventListener("DOMContentLoaded", function () {
 		const newType = tagTypeSelector.value;
 		const newTemplate = tagTemplateInput.value;
 		const newLinkItemTemplate = linkItemTemplateInput.value;
+		const newListItemTemplate = listItemTemplateInput.value;
 		const newRemoveLastBr = removeLastBrInput.checked;
 
 		// 入力検証: ボタン名が空でないかチェック
@@ -1110,6 +1130,15 @@ document.addEventListener("DOMContentLoaded", function () {
 			}
 		}
 
+		// p-listモードの場合、listItemTemplateも検証
+		if (newType === 'p-list' && newListItemTemplate) {
+			const listItemValidation = validateTemplate(newListItemTemplate, 'multi');
+			if (!listItemValidation.valid) {
+				alert('リスト項目の雛形エラー:\n' + listItemValidation.error);
+				return;
+			}
+		}
+
 		if (existingId) {
 			// 編集
 			const button = currentPattern.buttons.find((b) => b.id === existingId);
@@ -1118,6 +1147,7 @@ document.addEventListener("DOMContentLoaded", function () {
 				button.tagType = newType;
 				button.template = newTemplate;
 				button.linkItemTemplate = newLinkItemTemplate;
+				button.listItemTemplate = newListItemTemplate;
 				button.removeLastBr = newRemoveLastBr;
 			}
 		} else {
@@ -1130,6 +1160,7 @@ document.addEventListener("DOMContentLoaded", function () {
 				template: newTemplate,
 				tagType: newType,
 				linkItemTemplate: newLinkItemTemplate,
+				listItemTemplate: newListItemTemplate,
 				removeLastBr: newRemoveLastBr,
 			});
 		}
@@ -1593,9 +1624,12 @@ document.addEventListener("DOMContentLoaded", function () {
 			// リストコンテンツの構築
 			let listContent = "";
 			if (listLines.length > 0) {
+				// listItemTemplateが設定されている場合はそれを使用、なければデフォルトの<li>タグ
+				const listItemTemplate = tagInfo.listItemTemplate || '<li>[TEXT]</li>';
+
 				const listItems = listLines.map((line) => {
-					// すでにliタグが含まれていたらそのまま、そうでなければliタグで囲む
-					return line.match(/^\s*<li/i) ? line : `<li>${line}</li>`;
+					// カスタムテンプレートを使用してリスト項目を生成
+					return listItemTemplate.replace(/\[TEXT\]/g, line);
 				});
 				// 最後の項目から <br> を削除するオプション
 				if (tagInfo.removeLastBr && listItems.length > 0) {
