@@ -58,7 +58,8 @@
 
 		<!-- 入力エリア -->
 		<h2>入力エリア</h2>
-		<div id="container"></div>
+		<div id="container" role="list" aria-label="入力エリアのリスト"></div>
+		<button id="clearAllInputsButton" style="margin-top: 10px; color: red;">🗑️ すべての入力エリアをクリア</button>
 
 		<!-- 挿入位置セレクタ -->
 		<div id="insertionPointControls">
@@ -87,14 +88,14 @@
 		<button id="copyOutputButton">コードをコピー</button>
 
 		<div id="outputContainer">
-			<h3>変換されたHTMLコード</h3>
-			<pre><code id="htmlCodeOutput"></code></pre>
+			<h2>変換されたHTMLコード</h2>
+			<pre><code id="htmlCodeOutput" contenteditable="true" role="textbox" aria-multiline="true" aria-label="変換されたHTMLコードの編集エリア"></code></pre>
 		</div>
 
 		<!-- タグ追加/編集モーダル -->
-		<div id="tagModal" class="modal">
+		<div id="tagModal" class="modal" role="dialog" aria-labelledby="modalTitle" aria-modal="true" aria-hidden="true">
 			<div class="modal-content">
-				<span class="close">&times;</span>
+				<span class="close" role="button" tabindex="0" aria-label="モーダルを閉じる">&times;</span>
 				<h3 id="modalTitle">新しいタグボタンの追加</h3>
 				<form id="tagModalForm">
 					<input type="hidden" id="tagIdInput" />
@@ -104,9 +105,10 @@
 
 					<label for="tagTypeSelector">タグタイプ (動作モード)</label>
 					<select id="tagTypeSelector">
-						<option value="multi">マルチラインモード - 各行が個別のタグに変換</option>
-						<option value="p-list">段落+リストモード - テキストと箇条書きの組み合わせ</option>
-						<option value="link-list">リンクリストモード - 複数のリンクをリスト化</option>
+						<option value="multi">1. マルチラインモード - 各行が個別のタグに変換</option>
+						<option value="p-list">2. 段落+リストモード - テキストと箇条書きの組み合わせ</option>
+						<option value="link-list">3. リンクリストモード - 複数のリンクをリスト化</option>
+						<option value="static">4. 静的モード - テンプレートをそのまま出力（入力不可）</option>
 					</select>
 					<p style="font-size: 0.8em; color: #666; margin-top: -10px">
 						※入力エリアの動作（複数行の扱い、URLの取得など）を決定します。
@@ -123,6 +125,16 @@
 						<textarea id="linkItemTemplateInput" rows="4" placeholder='例: &lt;li class="rtoc-item"&gt;&lt;a href="[URL]"&gt;[TEXT]&lt;/a&gt;&lt;/li&gt;'></textarea>
 						<p style="font-size: 0.8em; color: #666; margin-top: -10px">
 							※繰り返される各リンク項目の形式を [URL] と [TEXT] を使って定義します。
+						</p>
+					</div>
+
+					<div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #ddd;">
+						<label style="display: flex; align-items: center; font-weight: normal; cursor: pointer;">
+							<input type="checkbox" id="removeLastBrInput" style="width: auto; margin-right: 8px;">
+							<span>最後の項目から末尾の &lt;br&gt; または &lt;br /&gt; を削除する</span>
+						</label>
+						<p style="font-size: 0.8em; color: #666; margin-top: 5px; margin-left: 24px;">
+							※チェックすると、最後の出力項目のみ末尾の改行タグが削除されます（全モード対応）。
 						</p>
 					</div>
 

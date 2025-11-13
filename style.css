@@ -1,28 +1,103 @@
+/* ========================================
+   CSS Variables for Theming
+   ======================================== */
+:root {
+	/* Color Palette */
+	--color-primary: #4CAF50;
+	--color-primary-dark: #0052a3;
+	--color-primary-light: #f0f8ff;
+	--color-secondary: #2c3e50;
+	--color-secondary-light: #ecf0f1;
+
+	/* Text Colors */
+	--color-text: #333;
+	--color-text-light: #666;
+	--color-text-lighter: #999;
+	--color-text-white: #fff;
+
+	/* Background Colors */
+	--color-bg: #fff;
+	--color-bg-light: #f9f9f9;
+	--color-bg-lighter: #fafafa;
+	--color-bg-input: #f5f5f5;
+	--color-bg-hover: #f5f5f5;
+
+	/* Border Colors */
+	--color-border: #ccc;
+	--color-border-light: #ddd;
+	--color-border-lighter: #eee;
+
+	/* Highlight Colors */
+	--color-highlight: yellow;
+	--color-link: #0066cc;
+	--color-danger: red;
+
+	/* Spacing */
+	--spacing-xs: 5px;
+	--spacing-sm: 10px;
+	--spacing-md: 15px;
+	--spacing-lg: 20px;
+	--spacing-xl: 30px;
+
+	/* Font Sizes */
+	--font-size-base: 16px;
+	--font-size-sm: 0.8em;
+	--font-size-md: 0.9em;
+	--font-size-lg: 1.8em;
+
+	/* Border Radius */
+	--border-radius: 4px;
+	--border-radius-lg: 8px;
+
+	/* Widths */
+	--width-max: 1200px;
+	--width-label: 120px;
+	--width-formatting-label: 150px;
+	--width-selector-min: 300px;
+
+	/* Heights */
+	--height-container-max: 600px;
+	--height-list-max: 300px;
+	--height-output-max: 500px;
+	--height-min-textarea: 60px;
+
+	/* Drag & Drop */
+	--drag-border: 3px solid var(--color-primary);
+	--drag-border-thin: 2px solid var(--color-primary);
+
+	/* Transitions */
+	--transition-default: all 0.2s;
+}
+
+/* ========================================
+   Global Styles
+   ======================================== */
+
 /* タイトルバナー（ミニマリストスタイル） */
 .title-banner {
-	background-color: #2c3e50;
-	color: #ecf0f1;
-	padding: 20px 0;
-	margin: -20px -20px 30px -20px;
+	background-color: var(--color-secondary);
+	color: var(--color-secondary-light);
+	padding: var(--spacing-lg) 0;
+	margin: calc(-1 * var(--spacing-lg)) calc(-1 * var(--spacing-lg)) var(--spacing-xl) calc(-1 * var(--spacing-lg));
 	text-align: center;
 }
 
 .title-banner h1 {
 	margin: 0;
-	font-size: 1.8em;
+	font-size: var(--font-size-lg);
 	font-weight: 300;
 	letter-spacing: 2px;
 	text-transform: lowercase;
 }
 
-/* サイト全体の幅を1200pxに固定し、中央寄せにする */
+/* サイト全体の幅を固定し、中央寄せにする */
 body {
-	max-width: 1200px;
+	max-width: var(--width-max);
 	margin: 0 auto;
-	padding: 20px;
+	padding: var(--spacing-lg);
 	box-sizing: border-box;
 	font-family: sans-serif;
-	font-size: 16px;
+	font-size: var(--font-size-base);
 }
 
 /* 変換パターン設定エリアのスタイル */
@@ -33,18 +108,18 @@ body {
 
 /* パターン管理コントロールのスタイル */
 #patternManagement {
-	border: 1px solid #ccc;
-	padding: 10px;
-	margin-top: 15px;
-	margin-bottom: 10px;
-	background-color: #f9f9f9;
+	border: 1px solid var(--color-border);
+	padding: var(--spacing-sm);
+	margin-top: var(--spacing-md);
+	margin-bottom: var(--spacing-sm);
+	background-color: var(--color-bg-light);
 	display: flex;
-	gap: 10px;
+	gap: var(--spacing-sm);
 	align-items: center;
 }
 #patternManagement button {
 	padding: 8px 12px;
-	font-size: 0.9em;
+	font-size: var(--font-size-md);
 	min-height: 36px;
 	display: inline-flex;
 	align-items: center;
@@ -56,6 +131,18 @@ body {
 	margin-right: 20px;
 	font-weight: bold;
 }
+/* 入力エリア全体のコンテナ */
+#container {
+	max-height: 600px;
+	overflow-y: auto;
+	padding: 10px;
+	padding-right: 5px;
+	margin-bottom: 15px;
+	border: 1px solid #ddd;
+	border-radius: 4px;
+	background-color: #fafafa;
+}
+
 /* 入力エリアのグループスタイル（高さ統一） */
 .input-area-group {
 	display: flex;
@@ -144,6 +231,17 @@ body {
 	margin-left: 10px;
 	padding: 5px 15px;
 	align-self: flex-start;
+}
+
+/* 変換ボタンのホバー効果 */
+.input-area-group .convert-input-button:hover {
+	background-color: #45a049 !important;
+	transform: translateY(-1px);
+	box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.input-area-group .convert-input-button:active {
+	transform: translateY(0);
 }
 
 /* タグ種別ラベルのスタイル */
@@ -375,7 +473,9 @@ body {
 	border-radius: 4px;
 	padding: 15px;
 	max-width: 100%;
+	max-height: 500px;
 	overflow-x: auto;
+	overflow-y: auto;
 	white-space: pre-wrap;
 	word-wrap: break-word;
 	word-break: break-all;
@@ -384,4 +484,14 @@ body {
 	font-family: "Courier New", Courier, monospace;
 	font-size: 0.9em;
 	line-height: 1.5;
+}
+
+#outputContainer code[contenteditable="true"] {
+	cursor: text;
+	outline: none;
+}
+
+#outputContainer code[contenteditable="true"]:focus {
+	background-color: #ffffff;
+	box-shadow: inset 0 0 0 2px #4CAF50;
 }

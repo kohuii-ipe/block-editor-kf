@@ -1,41 +1,417 @@
+/**
+ * ========================================
+ * Block Editor KF - Main Script
+ * ========================================
+ *
+ * 目次 (Table of Contents):
+ * 1. DOM要素のキャッシュ
+ * 2. グローバル変数とステート管理
+ * 3. ユーティリティ関数
+ * 4. セキュリティ関連（サニタイズ・バリデーション）
+ * 5. データ永続化（LocalStorage管理）
+ * 6. UI構築関数
+ * 7. パターン管理
+ * 8. タグボタン管理
+ * 9. 入力エリア管理
+ * 10. 変換ロジック
+ * 11. イベントハンドラ
+ * 12. 初期化
+ *
+ * ========================================
+ */
+
 document.addEventListener("DOMContentLoaded", function () {
-	// --- 要素の取得 ---
-	const convertAllButton = document.getElementById("convertToAllButton");
-	const clearOutputButton = document.getElementById("clearOutputButton");
-	const copyOutputButton = document.getElementById("copyOutputButton");
-	const container = document.getElementById("container");
-	const insertionPointSelector = document.getElementById("insertionPointSelector");
-	const htmlCodeOutput = document.getElementById("htmlCodeOutput");
+	// ========================================
+	// 1. DOM要素のキャッシュ（パフォーマンス最適化）
+	// ========================================
+	// すべての頻繁にアクセスされる要素を一度だけ取得して保持
+	const DOM = {
+		// 出力関連
+		convertAllButton: document.getElementById("convertToAllButton"),
+		clearOutputButton: document.getElementById("clearOutputButton"),
+		copyOutputButton: document.getElementById("copyOutputButton"),
+		htmlCodeOutput: document.getElementById("htmlCodeOutput"),
 
-	const patternSelectorContainer = document.getElementById("patternSelectorContainer");
-	const addPatternButton = document.getElementById("addPatternButton");
-	const renamePatternButton = document.getElementById("renamePatternButton");
-	const deletePatternButton = document.getElementById("deletePatternButton");
-	const tagButtonsContainer = document.getElementById("tagButtonsContainer"); // 新しいボタンコンテナ
+		// コンテナ
+		container: document.getElementById("container"),
+		clearAllInputsButton: document.getElementById("clearAllInputsButton"),
+		insertionPointSelector: document.getElementById("insertionPointSelector"),
 
-	// タグ管理関連
-	const addNewTagButton = document.getElementById("addNewTagButton");
-	const tagButtonList = document.getElementById("tagButtonList");
-	const tagModal = document.getElementById("tagModal");
-	const modalTitle = document.getElementById("modalTitle");
-	const tagModalForm = document.getElementById("tagModalForm");
-	const tagIdInput = document.getElementById("tagIdInput");
-	const tagNameInput = document.getElementById("tagNameInput");
-	const tagTypeSelector = document.getElementById("tagTypeSelector");
-	const tagTemplateInput = document.getElementById("tagTemplateInput");
-	const linkItemTemplateSection = document.getElementById("linkItemTemplateSection");
-	const linkItemTemplateInput = document.getElementById("linkItemTemplateInput");
-	const closeModalSpan = tagModal.querySelector(".close");
+		// パターン管理
+		patternSelectorContainer: document.getElementById("patternSelectorContainer"),
+		addPatternButton: document.getElementById("addPatternButton"),
+		renamePatternButton: document.getElementById("renamePatternButton"),
+		deletePatternButton: document.getElementById("deletePatternButton"),
+		tagButtonsContainer: document.getElementById("tagButtonsContainer"),
 
-	// 書式マッピング管理関連
-	const formattingList = document.getElementById("formattingList");
+		// タグ管理
+		addNewTagButton: document.getElementById("addNewTagButton"),
+		tagButtonList: document.getElementById("tagButtonList"),
+		tagModal: document.getElementById("tagModal"),
+		modalTitle: document.getElementById("modalTitle"),
+		tagModalForm: document.getElementById("tagModalForm"),
+		tagIdInput: document.getElementById("tagIdInput"),
+		tagNameInput: document.getElementById("tagNameInput"),
+		tagTypeSelector: document.getElementById("tagTypeSelector"),
+		tagTemplateInput: document.getElementById("tagTemplateInput"),
+		linkItemTemplateSection: document.getElementById("linkItemTemplateSection"),
+		linkItemTemplateInput: document.getElementById("linkItemTemplateInput"),
+		removeLastBrInput: document.getElementById("removeLastBrInput"),
+		closeModalSpan: null, // 後で初期化
+
+		// 書式マッピング管理
+		formattingList: document.getElementById("formattingList")
+	};
+
+	// closeModalSpanは依存関係があるため後で設定
+	DOM.closeModalSpan = DOM.tagModal ? DOM.tagModal.querySelector(".close") : null;
+
+	// 後方互換性のため、個別の定数も維持（既存コードとの互換性）
+	const {
+		convertAllButton, clearOutputButton, copyOutputButton, container,
+		clearAllInputsButton, insertionPointSelector, htmlCodeOutput, patternSelectorContainer,
+		addPatternButton, renamePatternButton, deletePatternButton,
+		tagButtonsContainer, addNewTagButton, tagButtonList, tagModal,
+		modalTitle, tagModalForm, tagIdInput, tagNameInput, tagTypeSelector,
+		tagTemplateInput, linkItemTemplateSection, linkItemTemplateInput,
+		removeLastBrInput, closeModalSpan, formattingList
+	} = DOM;
+
+	// ========================================
+	// 2. グローバル変数とステート管理
+	// ========================================
+
+	// --- 定数定義 (マジックナンバー・文字列の集約) ---
+	const CONSTANTS = {
+		// ストレージ関連
+		STORAGE_KEYS: {
+			PATTERNS: "customTagPatternsV2",
+			SETTINGS: "editorSettingsV2",
+			INPUT_AREAS: "inputAreasV2"
+		},
+
+		// サイズ制限
+		MAX_STORAGE_SIZE: 5 * 1024 * 1024, // 5MB
+		MAX_FILENAME_LENGTH: 255,
+
+		// タイミング
+		DEBOUNCE_DELAY: 500, // ミリ秒
+		MODAL_FOCUS_DELAY: 100, // ミリ秒
+
+		// UI文字列
+		MESSAGES: {
+			PATTERN_DELETE_CONFIRM: (name) => `パターン「${name}」を削除してもよろしいですか？`,
+			TAG_DELETE_CONFIRM: (name) => `タグ「${name}」を削除してもよろしいですか？`,
+			STORAGE_QUOTA_EXCEEDED: 'ストレージの容量が不足しています。\n一部のデータを削除するか、ブラウザのキャッシュをクリアしてください。',
+			PRIVATE_BROWSING: 'プライベートブラウジングモードでは保存できません。\n通常モードで開き直してください。',
+			DATA_TOO_LARGE: 'データが大きすぎて保存できません。一部のパターンを削除してください。',
+			CORRUPT_DATA: '保存されたデータが破損しています。デフォルトパターンを使用します。',
+			NO_COPY_DATA: 'コピーするHTMLコードがありません。',
+			COPY_SUCCESS: 'コピーしました！',
+			COPY_SUCCESS_FALLBACK: 'コピーしました！(FB)',
+		},
+
+		// プレースホルダー
+		PLACEHOLDERS: {
+			TEXT: '[TEXT]',
+			URL: '[URL]',
+			TEXT_P: '[TEXT_P]',
+			TEXT_P_NUMBERED: (n) => `[TEXT_P_${n}]`,
+			TEXT_LIST: '[TEXT_LIST]',
+			LINK_LIST: '[LINK_LIST]',
+		},
+
+		// スタイル
+		STYLES: {
+			DRAG_BORDER: '3px solid #4CAF50',
+			DRAG_BORDER_TOP: '2px solid #4CAF50',
+		},
+
+		// クラス名
+		CSS_CLASSES: {
+			DRAGGING: 'dragging',
+			DRAGGING_BUTTON: 'dragging-button',
+			DRAGGING_INPUT_AREA: 'dragging-input-area',
+		}
+	};
 
 	let areaIndex = 0;
 	let maxPatternId = 0;
 	let maxTagId = 0;
 	let isLoadingInputAreas = false; // 入力エリア読み込み中フラグ
 
-	// --- 雛形設定のデフォルトデータ（構造変更） ---
+	// ========================================
+	// 3. ユーティリティ関数
+	// ========================================
+
+	/**
+	 * デバウンス関数：連続した呼び出しを遅延させ、最後の呼び出しのみ実行
+	 * @param {Function} func - 実行する関数
+	 * @param {number} wait - 待機時間（ミリ秒）
+	 * @returns {Function} デバウンスされた関数
+	 */
+	const debounce = (func, wait) => {
+		let timeout;
+		return function executedFunction(...args) {
+			const later = () => {
+				clearTimeout(timeout);
+				func(...args);
+			};
+			clearTimeout(timeout);
+			timeout = setTimeout(later, wait);
+		};
+	};
+
+	/**
+	 * ドラッグ＆ドロップのイベントリスナーを設定する共通関数
+	 * コードの重複を削減するための抽象化
+	 * @param {HTMLElement} element - ドラッグ対象の要素
+	 * @param {Object} options - オプション設定
+	 * @param {string} options.draggingClass - ドラッグ中のCSSクラス名
+	 * @param {Function} options.onDrop - ドロップ時のコールバック関数
+	 * @param {AbortSignal} options.signal - イベントリスナー管理用のAbortSignal
+	 * @param {string} options.borderStyle - ドロップターゲットの境界線スタイル (default: '3px solid #4CAF50')
+	 * @param {string} options.cursorGrabbing - ドラッグ中のカーソルスタイル (default: 'grabbing')
+	 * @param {string} options.cursorGrab - 通常時のカーソルスタイル (default: 'grab')
+	 */
+	const setupDragAndDrop = (element, options) => {
+		const {
+			draggingClass,
+			onDrop,
+			signal,
+			borderStyle = '3px solid #4CAF50',
+			cursorGrabbing = 'grabbing',
+			cursorGrab = 'grab'
+		} = options;
+
+		// dragstart
+		element.addEventListener('dragstart', (e) => {
+			e.dataTransfer.effectAllowed = 'move';
+			e.dataTransfer.setData('text/html', e.target.innerHTML);
+			element.classList.add(draggingClass);
+			if (element.style) element.style.cursor = cursorGrabbing;
+		}, { signal });
+
+		// dragend
+		element.addEventListener('dragend', (e) => {
+			element.classList.remove(draggingClass);
+			if (element.style) element.style.cursor = cursorGrab;
+		}, { signal });
+
+		// dragover
+		element.addEventListener('dragover', (e) => {
+			e.preventDefault();
+			e.dataTransfer.dropEffect = 'move';
+
+			const draggingElement = document.querySelector(`.${draggingClass}`);
+			if (draggingElement && draggingElement !== element) {
+				element.style.borderLeft = borderStyle;
+			}
+		}, { signal });
+
+		// dragleave
+		element.addEventListener('dragleave', (e) => {
+			element.style.borderLeft = '';
+		}, { signal });
+
+		// drop
+		element.addEventListener('drop', (e) => {
+			e.preventDefault();
+			element.style.borderLeft = '';
+
+			const draggingElement = document.querySelector(`.${draggingClass}`);
+			if (!draggingElement || draggingElement === element) return;
+
+			if (onDrop) {
+				onDrop(draggingElement, element);
+			}
+		}, { signal });
+	};
+
+	// ========================================
+	// 4. セキュリティ関連（サニタイズ・バリデーション）
+	// ========================================
+
+	/**
+	 * テンプレート文字列を検証する関数
+	 * @param {string} template - 検証するテンプレート
+	 * @param {string} tagType - タグタイプ (multi, p-list, link-list など)
+	 * @returns {Object} { valid: boolean, error: string }
+	 */
+	const validateTemplate = (template, tagType) => {
+		// 空のテンプレートチェック（静的モードも含む）
+		if (!template || typeof template !== 'string' || template.trim() === '') {
+			return { valid: false, error: 'テンプレートが空です。雛形を入力してください。' };
+		}
+
+		// 静的モードの場合、プレースホルダーチェックや危険パターンチェックは不要
+		if (tagType === 'static') {
+			return { valid: true, error: '' };
+		}
+
+		// 必須プレースホルダーのチェック
+		const requiredPlaceholders = {
+			'multi': ['[TEXT]'],
+			'single': ['[TEXT]'],
+			'list': ['[TEXT]'],
+			'link': ['[TEXT]', '[URL]'],
+			'p-list': ['[TEXT_LIST]'],
+			'link-list': ['[LINK_LIST]'],
+			'static': [] // 静的モードはプレースホルダー不要
+		};
+
+		const required = requiredPlaceholders[tagType] || [];
+		for (const placeholder of required) {
+			if (!template.includes(placeholder)) {
+				return {
+					valid: false,
+					error: `テンプレートに必須のプレースホルダー「${placeholder}」が含まれていません。`
+				};
+			}
+		}
+
+		// 危険なパターンのチェック
+		const dangerousPatterns = [
+			{ pattern: /<script[\s\S]*?>[\s\S]*?<\/script>/gi, name: 'scriptタグ' },
+			{ pattern: /javascript:/gi, name: 'javascriptプロトコル' },
+			{ pattern: /on\w+\s*=/gi, name: 'イベントハンドラ (onclick等)' },
+			{ pattern: /<iframe/gi, name: 'iframeタグ' },
+			{ pattern: /<embed/gi, name: 'embedタグ' },
+			{ pattern: /<object/gi, name: 'objectタグ' }
+		];
+
+		for (const { pattern, name } of dangerousPatterns) {
+			if (pattern.test(template)) {
+				return {
+					valid: false,
+					error: `テンプレートに危険な要素（${name}）が含まれています。`
+				};
+			}
+		}
+
+		// 基本的なHTMLバランスチェック（開始タグと終了タグの数）
+		const openTags = (template.match(/<[^/][^>]*>/g) || [])
+			.filter(tag => !tag.match(/<(br|hr|img|input|meta|link)\b/i)); // 自己閉じタグを除外
+		const closeTags = template.match(/<\/[^>]+>/g) || [];
+
+		// プレースホルダーを除いた場合の開始/終了タグの数をチェック
+		const templateWithoutPlaceholders = template.replace(/\[[A-Z_0-9]+\]/g, '');
+		const openCount = (templateWithoutPlaceholders.match(/<[^/][^>]*>/g) || [])
+			.filter(tag => !tag.match(/<(br|hr|img|input|meta|link)\b/i)).length;
+		const closeCount = (templateWithoutPlaceholders.match(/<\/[^>]+>/g) || []).length;
+
+		// 警告レベル: タグのバランスが取れていない場合
+		if (openCount !== closeCount) {
+			// これは警告のみで、エラーとはしない（柔軟性のため）
+			console.warn('テンプレートのHTMLタグのバランスが取れていない可能性があります:', template);
+		}
+
+		return { valid: true, error: '' };
+	};
+
+	/**
+	 * HTMLを安全にサニタイズする関数
+	 * 許可されたタグと属性のみを保持し、危険なコンテンツを除去します
+	 */
+	const sanitizeHTML = (html) => {
+		if (!html || typeof html !== 'string') return '';
+
+		// 許可するタグと属性のホワイトリスト
+		const allowedTags = ['p', 'div', 'span', 'strong', 'b', 'em', 'i', 'u', 'mark', 'a', 'br', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'code', 'pre'];
+		const allowedAttributes = {
+			'a': ['href', 'title'],
+			'*': ['class', 'id', 'data-highlight', 'data-tag-id', 'data-placeholder']
+		};
+
+		// 危険なプロトコルをブロック
+		const dangerousProtocols = /^(javascript|data|vbscript):/i;
+
+		const tempDiv = document.createElement('div');
+		tempDiv.innerHTML = html;
+
+		const sanitizeNode = (node) => {
+			// テキストノードはそのまま返す
+			if (node.nodeType === Node.TEXT_NODE) {
+				return node.cloneNode(false);
+			}
+
+			// 要素ノードのみ処理
+			if (node.nodeType !== Node.ELEMENT_NODE) {
+				return null;
+			}
+
+			const tagName = node.tagName.toLowerCase();
+
+			// 許可されていないタグは子ノードのみ保持
+			if (!allowedTags.includes(tagName)) {
+				const fragment = document.createDocumentFragment();
+				for (let child of node.childNodes) {
+					const sanitizedChild = sanitizeNode(child);
+					if (sanitizedChild) {
+						fragment.appendChild(sanitizedChild);
+					}
+				}
+				return fragment;
+			}
+
+			// 許可されたタグの場合、新しい要素を作成
+			const newElement = document.createElement(tagName);
+
+			// 属性をフィルタリング
+			const tagAllowedAttrs = allowedAttributes[tagName] || [];
+			const globalAllowedAttrs = allowedAttributes['*'] || [];
+			const combinedAllowedAttrs = [...tagAllowedAttrs, ...globalAllowedAttrs];
+
+			for (let attr of node.attributes) {
+				const attrName = attr.name.toLowerCase();
+
+				// 許可された属性のみコピー
+				if (combinedAllowedAttrs.includes(attrName)) {
+					let attrValue = attr.value;
+
+					// hrefの場合、危険なプロトコルをチェック
+					if (attrName === 'href' && dangerousProtocols.test(attrValue)) {
+						continue; // 危険なhrefはスキップ
+					}
+
+					// on* イベントハンドラを除外
+					if (attrName.startsWith('on')) {
+						continue;
+					}
+
+					newElement.setAttribute(attrName, attrValue);
+				}
+			}
+
+			// 子ノードを再帰的にサニタイズ
+			for (let child of node.childNodes) {
+				const sanitizedChild = sanitizeNode(child);
+				if (sanitizedChild) {
+					newElement.appendChild(sanitizedChild);
+				}
+			}
+
+			return newElement;
+		};
+
+		const sanitizedFragment = document.createDocumentFragment();
+		for (let child of tempDiv.childNodes) {
+			const sanitizedChild = sanitizeNode(child);
+			if (sanitizedChild) {
+				sanitizedFragment.appendChild(sanitizedChild);
+			}
+		}
+
+		const resultDiv = document.createElement('div');
+		resultDiv.appendChild(sanitizedFragment);
+		return resultDiv.innerHTML;
+	};
+
+	// ========================================
+	// 5. データ永続化（LocalStorage管理）
+	// ========================================
+
+	// --- デフォルトデータ定義 ---
 
 	// デフォルトの書式マッピング設定（Word貼り付け用）
 	const defaultFormattingMap = {
@@ -98,23 +474,40 @@ document.addEventListener("DOMContentLoaded", function () {
 	};
 
 	let patterns = {}; // すべてのパターン設定を保持するグローバルオブジェクト
-
-	// --- 永続化と初期化 ---
-	const STORAGE_KEY = "customTagPatternsV2";
-	const SETTINGS_KEY = "editorSettingsV2";
-	const INPUT_AREAS_KEY = "inputAreasV2";
-
 	let formattingMap = {};
 
 	const saveAllPatterns = () => {
-		const selectedId = getSelectedPatternId();
+		try {
+			const selectedId = getSelectedPatternId();
 
-		localStorage.setItem(STORAGE_KEY, JSON.stringify(patterns));
+			// データサイズをチェック
+			const dataToSave = JSON.stringify(patterns);
+			const dataSize = new Blob([dataToSave]).size;
 
-		const settings = {
-			selectedPattern: selectedId,
-		};
-		localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+			if (dataSize > CONSTANTS.MAX_STORAGE_SIZE) {
+				console.error('保存データが大きすぎます:', dataSize, 'bytes');
+				alert(CONSTANTS.MESSAGES.DATA_TOO_LARGE);
+				return;
+			}
+
+			localStorage.setItem(CONSTANTS.STORAGE_KEYS.PATTERNS, dataToSave);
+
+			const settings = {
+				selectedPattern: selectedId,
+			};
+			localStorage.setItem(CONSTANTS.STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
+		} catch (error) {
+			console.error('パターンの保存に失敗しました:', error);
+
+			// QuotaExceededError の場合
+			if (error.name === 'QuotaExceededError' || error.code === 22) {
+				alert(CONSTANTS.MESSAGES.STORAGE_QUOTA_EXCEEDED);
+			} else if (error.name === 'SecurityError') {
+				alert(CONSTANTS.MESSAGES.PRIVATE_BROWSING);
+			} else {
+				alert('データの保存に失敗しました。\nエラー: ' + error.message);
+			}
+		}
 	};
 
 	const saveFormattingMap = () => {
@@ -150,44 +543,91 @@ document.addEventListener("DOMContentLoaded", function () {
 		// 読み込み中は保存しない
 		if (isLoadingInputAreas) return;
 
-		const areas = [];
-		const allGroups = container.querySelectorAll(".input-area-group");
-
-		allGroups.forEach((group) => {
-			const textarea = group.querySelector(".input-text-area");
-			if (textarea) {
-				areas.push({
-					tagId: textarea.getAttribute("data-tag-id"),
-					content: textarea.innerHTML,
-					groupId: group.id
-				});
-			}
-		});
-
-		localStorage.setItem(INPUT_AREAS_KEY, JSON.stringify(areas));
-	};
-
-	const loadInputAreas = () => {
-		const saved = localStorage.getItem(INPUT_AREAS_KEY);
-		if (!saved) return;
-
 		try {
-			isLoadingInputAreas = true; // 読み込み開始
-			const areas = JSON.parse(saved);
-			areas.forEach((area) => {
-				const tagInfo = getCustomTagInfo(area.tagId);
-				if (tagInfo) {
-					createTextarea(area.tagId, tagInfo.tagType, tagInfo.name, area.content);
+			const areas = [];
+			const allGroups = container.querySelectorAll(".input-area-group");
+
+			allGroups.forEach((group) => {
+				const textarea = group.querySelector(".input-text-area");
+				if (textarea) {
+					areas.push({
+						tagId: textarea.getAttribute("data-tag-id"),
+						content: textarea.innerHTML,
+						groupId: group.id
+					});
 				}
 			});
-		} catch (e) {
-			console.error("入力エリアの読み込みに失敗しました:", e);
-		} finally {
-			isLoadingInputAreas = false; // 読み込み終了
+
+			const dataToSave = JSON.stringify(areas);
+			const dataSize = new Blob([dataToSave]).size;
+
+			if (dataSize > CONSTANTS.MAX_STORAGE_SIZE) {
+				console.warn('入力エリアのデータが大きすぎます:', dataSize, 'bytes');
+				// 警告のみで、保存を試みる（古いデータを保持するため）
+			}
+
+			localStorage.setItem(CONSTANTS.STORAGE_KEYS.INPUT_AREAS, dataToSave);
+		} catch (error) {
+			console.error('入力エリアの保存に失敗しました:', error);
+
+			// エラーは通知するが、作業は続行可能
+			if (error.name === 'QuotaExceededError' || error.code === 22) {
+				console.warn('ストレージの容量が不足しています。入力内容が保存されない可能性があります。');
+			} else if (error.name === 'SecurityError') {
+				console.warn('プライベートブラウジングモードでは保存できません。');
+			}
 		}
 	};
 
-	// 書式マッピング管理UIの構築
+	// デバウンスされた保存関数（入力中のパフォーマンス向上）
+	const debouncedSaveInputAreas = debounce(saveInputAreas, CONSTANTS.DEBOUNCE_DELAY);
+
+	const loadInputAreas = () => {
+		try {
+			const saved = localStorage.getItem(CONSTANTS.STORAGE_KEYS.INPUT_AREAS);
+			if (!saved) return;
+
+			try {
+				isLoadingInputAreas = true; // 読み込み開始
+				const areas = JSON.parse(saved);
+
+				if (!Array.isArray(areas)) {
+					console.error('入力エリアのデータ形式が不正です');
+					return;
+				}
+
+				areas.forEach((area) => {
+					try {
+						const tagInfo = getCustomTagInfo(area.tagId);
+						if (tagInfo) {
+							createTextarea(area.tagId, tagInfo.tagType, tagInfo.name, area.content);
+						} else {
+							console.warn(`タグID "${area.tagId}" が見つかりません。スキップします。`);
+						}
+					} catch (areaError) {
+						console.error('個別の入力エリア復元に失敗しました:', areaError);
+						// 一部のエリアが失敗しても続行
+					}
+				});
+			} catch (parseError) {
+				console.error("入力エリアの解析に失敗しました:", parseError);
+				alert('入力エリアのデータが破損しています。新規作成してください。');
+			} finally {
+				isLoadingInputAreas = false; // 読み込み終了
+			}
+		} catch (error) {
+			console.error("入力エリアの読み込みに失敗しました:", error);
+			isLoadingInputAreas = false;
+		}
+	};
+
+	// ========================================
+	// 6. UI構築関数
+	// ========================================
+
+	/**
+	 * 書式マッピング管理UIを構築
+	 */
 	const buildFormattingUI = () => {
 		if (!formattingList) return;
 
@@ -214,7 +654,32 @@ document.addEventListener("DOMContentLoaded", function () {
 			input.placeholder = "テンプレートを入力 (例: <strong>[TEXT]</strong>)";
 
 			input.addEventListener("input", (e) => {
-				formattingMap[type].template = e.target.value.trim();
+				const newTemplate = e.target.value.trim();
+
+				// 空のテンプレートは許可（デフォルトに戻すため）
+				if (newTemplate) {
+					// 入力検証: [TEXT]プレースホルダーが含まれているかチェック
+					if (!newTemplate.includes('[TEXT]')) {
+						console.warn(`書式マッピング「${formatting.displayName}」に [TEXT] プレースホルダーが含まれていません`);
+						// 警告のみで保存は続行（柔軟性のため）
+					}
+
+					// 危険なパターンをチェック
+					const dangerousPatterns = [
+						/<script/gi,
+						/javascript:/gi,
+						/on\w+\s*=/gi
+					];
+
+					const hasDangerousContent = dangerousPatterns.some(pattern => pattern.test(newTemplate));
+					if (hasDangerousContent) {
+						alert(`書式マッピング「${formatting.displayName}」に危険な要素が含まれています。保存できません。`);
+						e.target.value = formattingMap[type].template || formatting.template || '';
+						return;
+					}
+				}
+
+				formattingMap[type].template = newTemplate;
 				// 後方互換性のため tag プロパティも削除
 				delete formattingMap[type].tag;
 				saveFormattingMap();
@@ -227,18 +692,27 @@ document.addEventListener("DOMContentLoaded", function () {
 	};
 
 	const loadAllPatterns = () => {
-		const savedPatterns = localStorage.getItem(STORAGE_KEY);
-		if (savedPatterns) {
-			try {
-				patterns = JSON.parse(savedPatterns);
-				if (Object.keys(patterns).length === 0) {
-					patterns = defaultPatterns;
+		try {
+			const savedPatterns = localStorage.getItem(CONSTANTS.STORAGE_KEYS.PATTERNS);
+			if (savedPatterns) {
+				try {
+					patterns = JSON.parse(savedPatterns);
+					if (Object.keys(patterns).length === 0) {
+						console.warn('保存されたパターンが空です。デフォルトパターンを使用します。');
+						patterns = JSON.parse(JSON.stringify(defaultPatterns));
+					}
+				} catch (parseError) {
+					console.error('保存データの解析に失敗しました:', parseError);
+					alert(CONSTANTS.MESSAGES.CORRUPT_DATA);
+					patterns = JSON.parse(JSON.stringify(defaultPatterns));
 				}
-			} catch (e) {
-				patterns = defaultPatterns;
+			} else {
+				patterns = JSON.parse(JSON.stringify(defaultPatterns));
 			}
-		} else {
-			patterns = defaultPatterns;
+		} catch (error) {
+			console.error('パターンの読み込みに失敗しました:', error);
+			alert('データの読み込みに失敗しました。デフォルトパターンを使用します。\nエラー: ' + error.message);
+			patterns = JSON.parse(JSON.stringify(defaultPatterns));
 		}
 
 		// IDの最大値を更新（ローカルストレージとデフォルトパターンの両方に対応）
@@ -276,15 +750,21 @@ document.addEventListener("DOMContentLoaded", function () {
 			}
 		});
 
-		const savedSettings = localStorage.getItem(SETTINGS_KEY);
 		let initialSelectedPattern = "pattern1";
-		if (savedSettings) {
-			try {
-				const settings = JSON.parse(savedSettings);
-				initialSelectedPattern = settings.selectedPattern || "pattern1";
-			} catch (e) {
-				// do nothing
+		try {
+			const savedSettings = localStorage.getItem(CONSTANTS.STORAGE_KEYS.SETTINGS);
+			if (savedSettings) {
+				try {
+					const settings = JSON.parse(savedSettings);
+					initialSelectedPattern = settings.selectedPattern || "pattern1";
+				} catch (parseError) {
+					console.warn('設定の解析に失敗しました:', parseError);
+					initialSelectedPattern = "pattern1";
+				}
 			}
+		} catch (error) {
+			console.warn('設定の読み込みに失敗しました:', error);
+			initialSelectedPattern = "pattern1";
 		}
 
 		rebuildPatternUI(initialSelectedPattern);
@@ -292,17 +772,31 @@ document.addEventListener("DOMContentLoaded", function () {
 		updateInsertionPoints(); // 入力エリアのリストを更新
 	};
 
-	// --- UI構築とパターン切り替え機能 ---
+	// ========================================
+	// 7. パターン管理
+	// ========================================
+
+	/**
+	 * 現在選択されているパターンIDを取得
+	 * @returns {string} パターンID
+	 */
 	const getSelectedPatternId = () => {
 		const checked = document.querySelector('input[name="conversionPattern"]:checked');
 		return checked ? checked.value : Object.keys(patterns)[0];
 	};
 
+	/**
+	 * パターン選択UIを再構築する関数
+	 * パフォーマンス最適化：DocumentFragmentを使用
+	 */
 	const rebuildPatternUI = (initialSelectedId) => {
 		patternSelectorContainer.innerHTML = "";
 
 		let firstId = null;
 		let selectedId = initialSelectedId;
+
+		// DocumentFragmentを使用してDOM操作を最適化
+		const fragment = document.createDocumentFragment();
 
 		Object.keys(patterns).forEach((id, index) => {
 			if (index === 0) firstId = id;
@@ -329,8 +823,11 @@ document.addEventListener("DOMContentLoaded", function () {
 
 			label.appendChild(input);
 			label.appendChild(nameSpan);
-			patternSelectorContainer.appendChild(label);
+			fragment.appendChild(label);
 		});
+
+		// 一度にすべてのパターンを追加（リフローを最小化）
+		patternSelectorContainer.appendChild(fragment);
 
 		// 3. 初期選択と表示状態の設定
 		const finalSelectedId = patterns[selectedId] ? selectedId : firstId;
@@ -418,14 +915,12 @@ document.addEventListener("DOMContentLoaded", function () {
 	deletePatternButton.addEventListener("click", () => {
 		const selectedId = getSelectedPatternId();
 		if (Object.keys(patterns).length <= 1) {
-			// alert("パターンは最低1つ必要です。");
-			// アラートの代わりにカスタムUIやコンソールログを使用
 			console.warn("パターンは最低1つ必要です。");
 			return;
 		}
 
 		const currentPattern = patterns[selectedId];
-		if (confirm(`パターン「${currentPattern.name}」を削除してもよろしいですか？`)) {
+		if (confirm(CONSTANTS.MESSAGES.PATTERN_DELETE_CONFIRM(currentPattern.name))) {
 			console.log(`パターン「${currentPattern.name}」を削除しました。`);
 			delete patterns[selectedId];
 
@@ -439,11 +934,23 @@ document.addEventListener("DOMContentLoaded", function () {
 		}
 	});
 
-	// --- タグボタン管理機能 ---
+	// ========================================
+	// 8. タグボタン管理
+	// ========================================
 
-	// モーダルの表示 (追加/編集)
+	/**
+	 * タグ追加/編集モーダルを開く
+	 * @param {Object|null} button - 編集する場合はボタンオブジェクト、新規追加の場合はnull
+	 */
 	const openTagModal = (button = null) => {
 		tagModal.style.display = "block";
+		tagModal.setAttribute('aria-hidden', 'false');
+
+		// フォーカスをモーダル内の最初の入力欄に移動（アクセシビリティ向上）
+		setTimeout(() => {
+			tagNameInput.focus();
+		}, CONSTANTS.MODAL_FOCUS_DELAY);
+
 		if (button) {
 			// 編集モード
 			modalTitle.textContent = "タグボタンの編集";
@@ -452,6 +959,7 @@ document.addEventListener("DOMContentLoaded", function () {
 			tagTypeSelector.value = button.tagType;
 			tagTemplateInput.value = button.template;
 			linkItemTemplateInput.value = button.linkItemTemplate || '<li class="rtoc-item"><a href="[URL]">[TEXT]</a></li>';
+			removeLastBrInput.checked = button.removeLastBr || false;
 		} else {
 			// 新規追加モード
 			modalTitle.textContent = "新しいタグボタンの追加";
@@ -460,29 +968,30 @@ document.addEventListener("DOMContentLoaded", function () {
 			tagTypeSelector.value = "single";
 			tagTemplateInput.value = "";
 			linkItemTemplateInput.value = '<li class="rtoc-item"><a href="[URL]">[TEXT]</a></li>';
+			removeLastBrInput.checked = false;
 		}
 
-		// ★★★ 修正箇所 ★★★
 		// モーダル表示時にプレースホルダーを更新
 		updateTemplatePlaceholder();
-		// ★★★ 修正箇所ここまで ★★★
 	};
 
 	// モーダルの閉じる処理
 	closeModalSpan.onclick = function () {
 		tagModal.style.display = "none";
+		tagModal.setAttribute('aria-hidden', 'true');
 	};
-	// 外側クリックでモーダルを閉じる機能は無効化（誤操作防止のため）
-	// window.onclick = function (event) {
-	// 	if (event.target == tagModal) {
-	// 		tagModal.style.display = "none";
-	// 	}
-	// };
+
+	// キーボードでモーダルを閉じる（Enter/Spaceキー）
+	closeModalSpan.addEventListener('keydown', function(e) {
+		if (e.key === 'Enter' || e.key === ' ') {
+			e.preventDefault();
+			tagModal.style.display = "none";
+			tagModal.setAttribute('aria-hidden', 'true');
+		}
+	});
 
 	// 「新しいタグボタンを追加」ボタン
 	addNewTagButton.addEventListener("click", () => openTagModal());
-
-	// ★★★ ここから修正箇所 ★★★
 
 	// 雛形テキストエリアのプレースホルダーを更新する関数
 	const updateTemplatePlaceholder = () => {
@@ -506,6 +1015,9 @@ document.addEventListener("DOMContentLoaded", function () {
 			case "link-list":
 				placeholder = '例:\n<div class="wrapper">\n<ul>\n[LINK_LIST]\n</ul>\n</div>\n\n【リンクリストモード】\n※[LINK_LIST]の位置に複数のリンク項目が挿入されます\n※下の「リンク項目の雛形」で各リンクの形式を指定します';
 				break;
+			case "static":
+				placeholder = '【静的モード】\n※テンプレート欄に入力したHTMLがそのまま出力されます\n※入力エリアは無効化されます（入力不可）\n※固定のHTMLブロックや定型文を出力するのに便利です\n\n例:\n<div class="alert">\n<p>このメッセージは固定です</p>\n</div>';
+				break;
 			default:
 				placeholder = "[TEXT] を使って雛形を入力";
 		}
@@ -514,8 +1026,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
 	// タグタイプセレクタが変更されたら、プレースホルダーを更新
 	tagTypeSelector.addEventListener("change", updateTemplatePlaceholder);
-
-	// ★★★ 修正箇所ここまで ★★★
 
 	// タグ保存 (追加/編集) 処理
 	tagModalForm.addEventListener("submit", (e) => {
@@ -530,6 +1040,29 @@ document.addEventListener("DOMContentLoaded", function () {
 		const newType = tagTypeSelector.value;
 		const newTemplate = tagTemplateInput.value;
 		const newLinkItemTemplate = linkItemTemplateInput.value;
+		const newRemoveLastBr = removeLastBrInput.checked;
+
+		// 入力検証: ボタン名が空でないかチェック
+		if (!newName) {
+			alert('ボタン名を入力してください。');
+			return;
+		}
+
+		// 入力検証: テンプレートの検証
+		const templateValidation = validateTemplate(newTemplate, newType);
+		if (!templateValidation.valid) {
+			alert('テンプレートエラー:\n' + templateValidation.error);
+			return;
+		}
+
+		// link-listモードの場合、linkItemTemplateも検証
+		if (newType === 'link-list' && newLinkItemTemplate) {
+			const linkItemValidation = validateTemplate(newLinkItemTemplate, 'link');
+			if (!linkItemValidation.valid) {
+				alert('リンク項目の雛形エラー:\n' + linkItemValidation.error);
+				return;
+			}
+		}
 
 		if (existingId) {
 			// 編集
@@ -539,6 +1072,7 @@ document.addEventListener("DOMContentLoaded", function () {
 				button.tagType = newType;
 				button.template = newTemplate;
 				button.linkItemTemplate = newLinkItemTemplate;
+				button.removeLastBr = newRemoveLastBr;
 			}
 		} else {
 			// 新規追加
@@ -550,6 +1084,7 @@ document.addEventListener("DOMContentLoaded", function () {
 				template: newTemplate,
 				tagType: newType,
 				linkItemTemplate: newLinkItemTemplate,
+				removeLastBr: newRemoveLastBr,
 			});
 		}
 
@@ -560,6 +1095,10 @@ document.addEventListener("DOMContentLoaded", function () {
 	});
 
 	// タグボタン一覧の構築
+	/**
+	 * タグボタン管理リストを再構築する関数
+	 * パフォーマンス最適化：DocumentFragmentを使用してバッチDOM操作を実行
+	 */
 	const rebuildTagButtonList = () => {
 		tagButtonList.innerHTML = "";
 		const patternId = getSelectedPatternId();
@@ -569,6 +1108,9 @@ document.addEventListener("DOMContentLoaded", function () {
 			tagButtonList.textContent = "タグボタンがありません。";
 			return;
 		}
+
+		// DocumentFragmentを使用してDOM操作を最適化
+		const fragment = document.createDocumentFragment();
 
 		currentPattern.buttons.forEach((button, index) => {
 			const item = document.createElement("div");
@@ -589,16 +1131,20 @@ document.addEventListener("DOMContentLoaded", function () {
 			dragHandle.style.color = "#999";
 			dragHandle.title = "ドラッグして順序を変更";
 
-			// ドラッグイベント
+			// AbortControllerでイベントリスナーを管理（メモリリーク対策）
+			const abortController = new AbortController();
+			const signal = abortController.signal;
+
+			// ドラッグイベント（signalオプションでメモリリーク防止）
 			item.addEventListener("dragstart", (e) => {
 				e.dataTransfer.effectAllowed = "move";
 				e.dataTransfer.setData("text/html", e.target.innerHTML);
 				item.classList.add("dragging");
-			});
+			}, { signal });
 
 			item.addEventListener("dragend", (e) => {
 				item.classList.remove("dragging");
-			});
+			}, { signal });
 
 			item.addEventListener("dragover", (e) => {
 				e.preventDefault();
@@ -617,12 +1163,12 @@ document.addEventListener("DOMContentLoaded", function () {
 						item.style.borderBottom = "2px solid #4CAF50";
 					}
 				}
-			});
+			}, { signal });
 
 			item.addEventListener("dragleave", (e) => {
 				item.style.borderTop = "";
 				item.style.borderBottom = "";
-			});
+			}, { signal });
 
 			item.addEventListener("drop", (e) => {
 				e.preventDefault();
@@ -641,40 +1187,51 @@ document.addEventListener("DOMContentLoaded", function () {
 				rebuildTagButtons();
 				rebuildTagButtonList();
 				saveAllPatterns();
-			});
+			}, { signal });
 
 			const editButton = document.createElement("button");
 			editButton.textContent = "編集";
-			editButton.addEventListener("click", () => openTagModal(button));
+			editButton.addEventListener("click", () => openTagModal(button), { signal });
 
 			const deleteButton = document.createElement("button");
 			deleteButton.textContent = "削除";
 			deleteButton.style.color = "red";
 			deleteButton.addEventListener("click", () => {
-				if (confirm(`タグ「${button.name}」を削除してもよろしいですか？`)) {
+				if (confirm(CONSTANTS.MESSAGES.TAG_DELETE_CONFIRM(button.name))) {
 					console.log(`タグ「${button.name}」を削除しました。`);
 					currentPattern.buttons = currentPattern.buttons.filter((b) => b.id !== button.id);
 					rebuildTagButtons();
 					rebuildTagButtonList();
 					saveAllPatterns();
 				}
-			});
+			}, { signal });
 
 			item.appendChild(dragHandle);
 			item.appendChild(infoSpan);
 			item.appendChild(editButton);
 			item.appendChild(deleteButton);
-			tagButtonList.appendChild(item);
+			fragment.appendChild(item);
 		});
+
+		// 一度にすべてのアイテムを追加（リフローを最小化）
+		tagButtonList.appendChild(fragment);
 	};
 
 	// --- タグボタン群の動的生成 ---
 
+	/**
+	 * タグボタンを再構築する関数
+	 * パフォーマンス最適化：DocumentFragmentを使用してバッチDOM操作を実行
+	 * 注意：ドラッグ＆ドロップの順序変更やパターン切り替えでは全体の再構築が必要です
+	 */
 	const rebuildTagButtons = () => {
 		tagButtonsContainer.innerHTML = "";
 		const patternId = getSelectedPatternId();
 		const currentPattern = patterns[patternId];
 		if (!currentPattern) return;
+
+		// DocumentFragmentを使用してDOM操作を最適化（リフローを1回のみに削減）
+		const fragment = document.createDocumentFragment();
 
 		currentPattern.buttons.forEach((button, index) => {
 			const btn = document.createElement("button");
@@ -684,23 +1241,27 @@ document.addEventListener("DOMContentLoaded", function () {
 			btn.dataset.index = index;
 			btn.style.cursor = "grab";
 
+			// AbortControllerでイベントリスナーを管理（メモリリーク対策）
+			const abortController = new AbortController();
+			const signal = abortController.signal;
+
 			// クリックイベント
 			btn.addEventListener("click", () =>
 				createTextarea(button.id, button.tagType, button.name)
-			);
+			, { signal });
 
-			// ドラッグイベント
+			// ドラッグイベント（signalオプションでメモリリーク防止）
 			btn.addEventListener("dragstart", (e) => {
 				e.dataTransfer.effectAllowed = "move";
 				e.dataTransfer.setData("text/html", e.target.innerHTML);
 				btn.classList.add("dragging-button");
 				btn.style.cursor = "grabbing";
-			});
+			}, { signal });
 
 			btn.addEventListener("dragend", (e) => {
 				btn.classList.remove("dragging-button");
 				btn.style.cursor = "grab";
-			});
+			}, { signal });
 
 			btn.addEventListener("dragover", (e) => {
 				e.preventDefault();
@@ -710,11 +1271,11 @@ document.addEventListener("DOMContentLoaded", function () {
 				if (draggingButton && draggingButton !== btn) {
 					btn.style.borderLeft = "3px solid #4CAF50";
 				}
-			});
+			}, { signal });
 
 			btn.addEventListener("dragleave", (e) => {
 				btn.style.borderLeft = "";
-			});
+			}, { signal });
 
 			btn.addEventListener("drop", (e) => {
 				e.preventDefault();
@@ -733,16 +1294,23 @@ document.addEventListener("DOMContentLoaded", function () {
 				rebuildTagButtons();
 				rebuildTagButtonList();
 				saveAllPatterns();
-			});
+			}, { signal });
 
-			tagButtonsContainer.appendChild(btn);
+			fragment.appendChild(btn);
 		});
+
+		// 一度にすべてのボタンを追加（リフローを最小化）
+		tagButtonsContainer.appendChild(fragment);
 	};
 
-	// --- 変換ロジックの修正 ---
+	// ========================================
+	// 9. 入力エリア管理
+	// ========================================
 
 	/**
 	 * 選択されたパターンIDとタグIDに基づいてカスタムテンプレートとタイプを取得する関数
+	 * @param {string} tagId - タグID
+	 * @returns {Object|null} タグ情報オブジェクト
 	 */
 	const getCustomTagInfo = (tagId) => {
 		const patternId = getSelectedPatternId();
@@ -755,8 +1323,10 @@ document.addEventListener("DOMContentLoaded", function () {
 	// contenteditable div から改行を保持したテキストを取得するヘルパー関数
 	// formatting タグ（strong, mark）は保持し、block要素は改行に変換
 	function getTextWithLineBreaks(htmlContent) {
+		// XSS対策: 入力HTMLをサニタイズ
+		const sanitizedContent = sanitizeHTML(htmlContent);
 		const tempDiv = document.createElement("div");
-		tempDiv.innerHTML = htmlContent;
+		tempDiv.innerHTML = sanitizedContent;
 
 		const processNode = (node) => {
 			if (node.nodeType === Node.TEXT_NODE) {
@@ -831,8 +1401,10 @@ document.addEventListener("DOMContentLoaded", function () {
 	// contenteditable div から改行を保持したプレーンテキストを取得するヘルパー関数
 	// link-list モード用：すべてのHTMLタグを除去し、純粋なテキストのみを抽出
 	function getPlainTextWithLineBreaks(htmlContent) {
+		// XSS対策: 入力HTMLをサニタイズ
+		const sanitizedContent = sanitizeHTML(htmlContent);
 		const tempDiv = document.createElement("div");
-		tempDiv.innerHTML = htmlContent;
+		tempDiv.innerHTML = sanitizedContent;
 
 		// innerText を使用すると、ブラウザが自動的に<br>やblock要素を改行に変換してくれる
 		let text = tempDiv.innerText || tempDiv.textContent || "";
@@ -888,10 +1460,18 @@ document.addEventListener("DOMContentLoaded", function () {
 		return cleaned;
 	}
 
-	// 共通の変換ロジック (タグタイプに応じて処理を振り分けるように変更)
+	// ========================================
+	// 10. 変換ロジック
+	// ========================================
+
+	/**
+	 * テキストエリアの内容をHTMLに変換する共通関数
+	 * タグタイプに応じて適切な変換処理を実行
+	 * @param {HTMLElement} textareaElement - 変換対象のテキストエリア要素
+	 * @returns {string} 変換されたHTML文字列
+	 */
 	function convertTextToHtmlString(textareaElement) {
 		const htmlContent = textareaElement.innerHTML;
-		if (!htmlContent || htmlContent.trim() === "") return ""; // 空白/空の場合は空文字を返す
 
 		const tagId = textareaElement.getAttribute("data-tag-id");
 		const tagInfo = getCustomTagInfo(tagId);
@@ -899,22 +1479,33 @@ document.addEventListener("DOMContentLoaded", function () {
 		// タグ情報がない場合は、HTMLコメントとして警告を返す
 		if (!tagInfo) return `<!-- 警告: 不明なタグID (${tagId}) のためスキップされました -->\n`;
 
+		const tagType = tagInfo.tagType;
+		const templateString = tagInfo.template;
+
+		// 静的モード: テンプレートをそのまま出力（入力テキストは無視、空でもOK）
+		if (tagType === "static") {
+			if (templateString.trim() === "") {
+				return `<!-- 警告: タグ (${tagInfo.name}) の雛形が空のためスキップされました -->\n`;
+			}
+			const output = templateString.trim();
+			// 最後に改行を加えておく (追記時に扱いやすいように)
+			return output + "\n";
+		}
+
+		// 静的モード以外では、入力が空の場合は空文字を返す
+		if (!htmlContent || htmlContent.trim() === "") return "";
+
 		// link-list モードの場合はプレーンテキストを取得、それ以外は書式を保持
 		const text = (tagInfo.tagType === "link-list")
 			? getPlainTextWithLineBreaks(htmlContent)
 			: getTextWithLineBreaks(htmlContent);
 
-		// ★★★
-		// テンプレートが空文字列の場合、警告を返すように修正
-		// (修正しない場合、空文字列が返され、trim()で消えてしまうため)
-		const templateString = tagInfo.template;
+		let output = "";
+
+		// テンプレートが空文字列の場合、警告を返す
 		if (templateString.trim() === "") {
 			return `<!-- 警告: タグ (${tagInfo.name}) の雛形が空のためスキップされました -->\n`;
 		}
-		// ★★★
-
-		const tagType = tagInfo.tagType;
-		let output = "";
 
 		if (tagType === "link") {
 			// リンクタグ系の特別処理 (link)
@@ -924,6 +1515,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
 			if (url) {
 				output = templateString.replace(/\[TEXT\]/g, linkText).replace(/\[URL\]/g, url);
+				// 最後の項目から <br> を削除するオプション
+				if (tagInfo.removeLastBr) {
+					output = output.replace(/<br\s*\/?\s*>\s*$/i, '').trimEnd();
+				}
 			} else {
 				output = `<!-- 警告: リンクエリアですがURLが2行目に指定されていません (${linkText}) -->\n`;
 			}
@@ -952,10 +1547,16 @@ document.addEventListener("DOMContentLoaded", function () {
 			// リストコンテンツの構築
 			let listContent = "";
 			if (listLines.length > 0) {
-				listContent = listLines.map((line) => {
-				// すでにliタグが含まれていたらそのまま、そうでなければliタグで囲む
-				return line.match(/^\s*<li/i) ? line : `<li>${line}</li>`;
-			}).join("\n");
+				const listItems = listLines.map((line) => {
+					// すでにliタグが含まれていたらそのまま、そうでなければliタグで囲む
+					return line.match(/^\s*<li/i) ? line : `<li>${line}</li>`;
+				});
+				// 最後の項目から <br> を削除するオプション
+				if (tagInfo.removeLastBr && listItems.length > 0) {
+					const lastIndex = listItems.length - 1;
+					listItems[lastIndex] = listItems[lastIndex].replace(/<br\s*\/?\s*>\s*$/i, '').trimEnd();
+				}
+				listContent = listItems.join("\n");
 			} else {
 				listContent = `<li>リスト項目がありません</li>`;
 			}
@@ -983,35 +1584,52 @@ document.addEventListener("DOMContentLoaded", function () {
 			}
 		} else if (tagType === "list") {
 			// リストタグの処理 (list)
-			let listContent = text.trim().split("\n")
+			const listItems = text.trim().split("\n")
 				.filter((line) => line.trim() !== "")
 				.map((line) => {
 					// すでにliタグが含まれていたらそのまま、そうでなければliタグで囲む
 					return line.match(/^\s*<li/i) ? line : `<li>${line.trim()}</li>`;
-				}).join("\n");
+				});
 
+			// 最後の項目から <br> を削除するオプション
+			if (tagInfo.removeLastBr && listItems.length > 0) {
+				const lastIndex = listItems.length - 1;
+				listItems[lastIndex] = listItems[lastIndex].replace(/<br\s*\/?\s*>\s*$/i, '').trimEnd();
+			}
+
+			let listContent = listItems.join("\n");
 			if (listContent.trim() === "") listContent = `<li>リスト項目がありません</li>`;
 
 			output = templateString.replace(/\[TEXT\]/g, listContent);
 		} else if (tagType === "single") {
 			// 単一タグの処理 (single)
 			let content = text.trim().replace(/\n/g, "<br>");
+			// 最後の <br> を削除するオプション
+			if (tagInfo.removeLastBr) {
+				content = content.replace(/<br\s*\/?\s*>\s*$/i, '').trimEnd();
+			}
 			output = templateString.replace(/\[TEXT\]/g, content);
 		} else if (tagType === "multi") {
 			// マルチラインタグの処理 (multi) - 各行が個別のタグになる
 			const lines = text.trim().split("\n").filter((line) => line.trim() !== "");
 
 			if (lines.length > 0) {
-				output = lines.map((line) => {
+				const lineItems = lines.map((line) => {
 					return templateString.replace(/\[TEXT\]/g, line.trim());
-				}).join("\n");
+				});
+				// 最後の項目から <br> を削除するオプション
+				if (tagInfo.removeLastBr && lineItems.length > 0) {
+					const lastIndex = lineItems.length - 1;
+					lineItems[lastIndex] = lineItems[lastIndex].replace(/<br\s*\/?\s*>\s*$/i, '').trimEnd();
+				}
+				output = lineItems.join("\n");
 			} else {
 				output = `<!-- 警告: テキストが入力されていません -->\n`;
 			}
 		} else if (tagType === "link-list") {
 			// リンクリストの処理 (link-list)
 			const lines = text.trim().split("\n").map((line) => line.trim()).filter((line) => line !== "");
-			let linkListContent = "";
+			const linkItems = [];
 
 			// カスタムリンク項目テンプレートを取得（デフォルト値を設定）
 			const linkItemTemplate = tagInfo.linkItemTemplate || '<li class="rtoc-item"><a href="[URL]">[TEXT]</a></li>';
@@ -1024,14 +1642,24 @@ document.addEventListener("DOMContentLoaded", function () {
 				if (linkText && linkUrl) {
 					// カスタムテンプレートを使用して変換
 					const itemHtml = linkItemTemplate.replace(/\[TEXT\]/g, linkText).replace(/\[URL\]/g, linkUrl);
-					linkListContent += itemHtml + "\n";
+					linkItems.push(itemHtml);
 				} else if (linkText) {
 					// URLがない場合は警告
-					linkListContent += `<!-- 警告: "${linkText}" のURLが指定されていません -->\n`;
+					linkItems.push(`<!-- 警告: "${linkText}" のURLが指定されていません -->`);
 				}
 			}
 
-			if (linkListContent.trim() === "") {
+			// 最後の項目から <br> または <br /> を削除するオプション
+			if (tagInfo.removeLastBr && linkItems.length > 0) {
+				const lastIndex = linkItems.length - 1;
+				// 末尾の <br> または <br /> とその後の空白を削除（大文字小文字・スペースの有無を考慮）
+				linkItems[lastIndex] = linkItems[lastIndex].replace(/<br\s*\/?\s*>\s*$/i, '').trimEnd();
+			}
+
+			let linkListContent = "";
+			if (linkItems.length > 0) {
+				linkListContent = linkItems.join("\n");
+			} else {
 				linkListContent = `<li class="rtoc-item">リンク項目がありません</li>`;
 			}
 
@@ -1112,6 +1740,9 @@ document.addEventListener("DOMContentLoaded", function () {
 		// HTMLをパースして変換
 		const convertedHTML = convertWordHTMLToTags(htmlData);
 
+		// XSS対策: 変換されたHTMLをサニタイズ
+		const sanitizedHTML = sanitizeHTML(convertedHTML);
+
 		// contenteditable の場合、カーソル位置にHTMLを挿入
 		const selection = window.getSelection();
 		if (!selection.rangeCount) return;
@@ -1121,7 +1752,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
 		// HTMLフラグメントを作成して挿入
 		const tempDiv = document.createElement("div");
-		tempDiv.innerHTML = convertedHTML;
+		tempDiv.innerHTML = sanitizedHTML;
 		const fragment = document.createDocumentFragment();
 		while (tempDiv.firstChild) {
 			fragment.appendChild(tempDiv.firstChild);
@@ -1295,6 +1926,15 @@ document.addEventListener("DOMContentLoaded", function () {
 		const groupDiv = document.createElement("div");
 		groupDiv.className = "input-area-group";
 		groupDiv.id = `area-group-${areaIndex}`;
+		groupDiv.setAttribute('role', 'listitem');
+		groupDiv.setAttribute('aria-label', `入力エリア: ${tagName}`);
+
+		// AbortControllerでイベントリスナーを管理（メモリリーク対策）
+		const abortController = new AbortController();
+		const signal = abortController.signal;
+
+		// 要素削除時にイベントリスナーをクリーンアップする関数を保存
+		groupDiv._cleanup = () => abortController.abort();
 
 		const tagLabel = document.createElement("span");
 		tagLabel.className = "input-label-tag";
@@ -1310,18 +1950,18 @@ document.addEventListener("DOMContentLoaded", function () {
 		tagTextSpan.textContent = tagName;
 		tagLabel.appendChild(tagTextSpan);
 
-		// ドラッグイベント（ラベルのみ）
+		// ドラッグイベント（ラベルのみ）（signalオプションでメモリリーク防止）
 		tagLabel.addEventListener("dragstart", (e) => {
 			e.dataTransfer.effectAllowed = "move";
 			e.dataTransfer.setData("text/html", groupDiv.id);
 			groupDiv.classList.add("dragging-input-area");
 			tagLabel.style.cursor = "grabbing";
-		});
+		}, { signal });
 
 		tagLabel.addEventListener("dragend", (e) => {
 			groupDiv.classList.remove("dragging-input-area");
 			tagLabel.style.cursor = "grab";
-		});
+		}, { signal });
 
 		groupDiv.addEventListener("dragover", (e) => {
 			e.preventDefault();
@@ -1340,12 +1980,12 @@ document.addEventListener("DOMContentLoaded", function () {
 					groupDiv.style.borderBottom = "3px solid #4CAF50";
 				}
 			}
-		});
+		}, { signal });
 
 		groupDiv.addEventListener("dragleave", (e) => {
 			groupDiv.style.borderTop = "";
 			groupDiv.style.borderBottom = "";
-		});
+		}, { signal });
 
 		groupDiv.addEventListener("drop", (e) => {
 			e.preventDefault();
@@ -1369,27 +2009,41 @@ document.addEventListener("DOMContentLoaded", function () {
 
 			updateInsertionPoints();
 			saveInputAreas();
-		});
+		}, { signal });
 
 		const newTextarea = document.createElement("div");
 		newTextarea.className = `input-text-area input-${tagId}-area`;
 		newTextarea.id = `text-area-${tagId}-${areaIndex}`;
-		newTextarea.setAttribute("contenteditable", "true");
+
+		// 静的モードの場合は編集不可にする
+		if (tagType === "static") {
+			newTextarea.setAttribute("contenteditable", "false");
+			newTextarea.style.backgroundColor = "#f0f0f0";
+			newTextarea.style.cursor = "not-allowed";
+			newTextarea.style.opacity = "0.7";
+		} else {
+			newTextarea.setAttribute("contenteditable", "true");
+		}
+
+		newTextarea.setAttribute("role", "textbox");
+		newTextarea.setAttribute("aria-multiline", "true");
+		newTextarea.setAttribute("aria-label", `${tagName}のテキスト入力エリア`);
 		newTextarea.setAttribute("data-tag-id", tagId); // タグIDをデータ属性として保持
 		// 初期コンテンツを設定（空の場合は完全に空にしてプレースホルダーを表示）
 		if (initialContent && initialContent.trim() !== "") {
-			newTextarea.innerHTML = initialContent;
+			// XSS対策: 保存されたコンテンツをサニタイズしてから設定
+			newTextarea.innerHTML = sanitizeHTML(initialContent);
 		}
 
-		// テキストエリアの内容が変更されたら保存
+		// テキストエリアの内容が変更されたら保存（デバウンス版を使用してパフォーマンス向上）
 		newTextarea.addEventListener("input", () => {
-			saveInputAreas();
-		});
+			debouncedSaveInputAreas();
+		}, { signal });
 
 		// 貼り付けイベント：Word書式を保持
 		newTextarea.addEventListener("paste", (e) => {
 			handleFormattedPaste(e, newTextarea);
-		});
+		}, { signal });
 
 		let placeholderText = `${tagName}タグ用のテキストエリア`;
 
@@ -1399,24 +2053,57 @@ document.addEventListener("DOMContentLoaded", function () {
 			placeholderText = `【${tagName}】段落+リストモード：通常の行は段落、「-」または「*」で始まる行はリスト項目になります`;
 		} else if (tagType === "link-list") {
 			placeholderText = `【${tagName}】リンクリストモード：奇数行にリンクテキスト、偶数行にURLを交互に入力してください`;
+		} else if (tagType === "static") {
+			placeholderText = `【${tagName}】静的モード：テンプレートで設定した内容がそのまま出力されます（入力不可）`;
 		} else {
 			// 古いモード (single, list, link) のための後方互換性
 			placeholderText = `${tagName}エリア。テキストを入力してください。`;
 		}
 		newTextarea.setAttribute("data-placeholder", placeholderText);
 
+		const convertButton = document.createElement("button");
+		convertButton.textContent = "変換";
+		convertButton.className = "convert-input-button";
+		convertButton.setAttribute('aria-label', `${tagName}入力エリアを個別に変換`);
+		convertButton.style.backgroundColor = "#4CAF50";
+		convertButton.style.color = "white";
+		convertButton.style.marginRight = "5px";
+
+		convertButton.addEventListener("click", () => {
+			// 変換直前に設定を保存し、最新のテンプレートを取得できるように保証
+			saveAllPatterns();
+
+			// この入力エリアのみを変換
+			const outputHtmlString = convertTextToHtmlString(newTextarea);
+
+			// 新しい内容が空でなければ追記
+			if (outputHtmlString.trim().length > 0) {
+				const existingContent = htmlCodeOutput.textContent.trim();
+				if (existingContent.length > 0) {
+					htmlCodeOutput.textContent += "\n"; // 既存の内容があれば改行を追加
+				}
+				htmlCodeOutput.textContent += outputHtmlString;
+			}
+		}, { signal });
+
 		const deleteButton = document.createElement("button");
 		deleteButton.textContent = "削除";
 		deleteButton.className = "delete-input-button";
+		deleteButton.setAttribute('aria-label', `${tagName}入力エリアを削除`);
 
 		deleteButton.addEventListener("click", () => {
+			// イベントリスナーをクリーンアップしてメモリリークを防止
+			if (groupDiv._cleanup) {
+				groupDiv._cleanup();
+			}
 			groupDiv.remove();
 			updateInsertionPoints();
 			saveInputAreas(); // 削除後に保存
-		});
+		}, { signal });
 
 		groupDiv.appendChild(tagLabel);
 		groupDiv.appendChild(newTextarea);
+		groupDiv.appendChild(convertButton);
 		groupDiv.appendChild(deleteButton);
 
 		const insertPoint = insertionPointSelector.value;
@@ -1439,14 +2126,9 @@ document.addEventListener("DOMContentLoaded", function () {
 		saveInputAreas(); // 作成後に保存
 	};
 
-	// --- ページ初期化 ---
-	loadAllPatterns();
-	loadFormattingMap();
-	buildFormattingUI(); // 書式マッピング管理UIを初期表示
-	rebuildTagButtonList(); // タグボタン管理一覧を初期表示
-	loadInputAreas(); // 入力エリアを復元
-
-	// --- その他の機能 (変更なし) ---
+	// ========================================
+	// 11. イベントハンドラとその他の機能
+	// ========================================
 
 	// 選択範囲をタグで囲むコア関数 (変更なし)
 	window.wrapSelectionWithTag = (tagName) => {
@@ -1496,12 +2178,37 @@ document.addEventListener("DOMContentLoaded", function () {
 		});
 	}
 
+	// すべての入力エリアをクリア機能
+	if (clearAllInputsButton) {
+		clearAllInputsButton.addEventListener("click", function () {
+			// 確認ダイアログを表示
+			if (!confirm("すべての入力エリアを削除してもよろしいですか？")) {
+				return;
+			}
+
+			// すべての子要素を削除
+			while (container.firstChild) {
+				const child = container.firstChild;
+				// クリーンアップ関数が存在する場合は実行（メモリリーク防止）
+				if (child._cleanup) {
+					child._cleanup();
+				}
+				container.removeChild(child);
+			}
+
+			// 挿入位置セレクタを更新
+			updateInsertionPoints();
+
+			// 状態を保存
+			saveInputAreas();
+		});
+	}
+
 	// コードコピー機能 (変更なし)
 	if (copyOutputButton) {
 		copyOutputButton.addEventListener("click", async function () {
 			const textToCopy = htmlCodeOutput.textContent;
 			if (textToCopy.trim().length === 0) {
-				// alert("コピーするHTMLコードがありません。");
 				console.warn("コピーするHTMLコードがありません。");
 				return;
 			}
@@ -1509,7 +2216,7 @@ document.addEventListener("DOMContentLoaded", function () {
 			try {
 				await navigator.clipboard.writeText(textToCopy);
 				const originalText = copyOutputButton.textContent;
-				copyOutputButton.textContent = "コピーしました！";
+				copyOutputButton.textContent = CONSTANTS.MESSAGES.COPY_SUCCESS;
 				setTimeout(() => {
 					copyOutputButton.textContent = originalText;
 				}, 1500);
@@ -1525,19 +2232,29 @@ document.addEventListener("DOMContentLoaded", function () {
 					document.body.removeChild(tempTextarea);
 
 					const originalText = copyOutputButton.textContent;
-					copyOutputButton.textContent = "コピーしました！(FB)";
+					copyOutputButton.textContent = CONSTANTS.MESSAGES.COPY_SUCCESS_FALLBACK;
 					setTimeout(() => {
 						copyOutputButton.textContent = originalText;
 					}, 1500);
 				} catch (copyErr) {
 					console.error("フォールバックコピーにも失敗しました:", copyErr);
-					// alert は使用しない
 				}
 			}
 		});
 	}
 
-	// 【修正】一括変換機能
+	// ========================================
+	// 12. 初期化
+	// ========================================
+
+	// ページ読み込み時にデータを復元してUIを初期化
+	loadAllPatterns();
+	loadFormattingMap();
+	buildFormattingUI(); // 書式マッピング管理UIを初期表示
+	rebuildTagButtonList(); // タグボタン管理一覧を初期表示
+	loadInputAreas(); // 入力エリアを復元
+
+	// 一括変換機能
 	if (convertAllButton) {
 		convertAllButton.addEventListener("click", function () {
 			// 変換直前に設定を保存し、最新のテンプレートを取得できるように保証します
