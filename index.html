@@ -52,6 +52,7 @@
 			<div id="formattingList">
 				<!-- 書式マッピング設定がJSでここに表示されます -->
 			</div>
+			<button id="saveFormattingButton" style="margin-top: 10px;">💾 書式マッピングを保存</button>
 		</div>
 
 		<hr />
@@ -107,24 +108,26 @@
 					<select id="tagTypeSelector">
 						<option value="multi">1. マルチラインモード - 各行が個別のタグに変換</option>
 						<option value="p-list">2. 段落+リストモード - テキストと箇条書きの組み合わせ</option>
-						<option value="link-list">3. リンクリストモード - 複数のリンクをリスト化</option>
+						<option value="link-list">3. リンクリストモード - 複数のリンクをリスト化（[テキスト](URL)形式）</option>
 						<option value="static">4. 静的モード - テンプレートをそのまま出力（入力不可）</option>
+						<option value="single-link">5. 単一リンクモード - 1つのリンクを作成（[テキスト](URL)形式）</option>
+						<option value="code">6. コードモード - コードをHTMLエスケープして出力（<, >, &などを変換）</option>
 					</select>
 					<p style="font-size: 0.8em; color: #666; margin-top: -10px">
 						※入力エリアの動作（複数行の扱い、URLの取得など）を決定します。
 					</p>
 
 					<label for="tagTemplateInput">雛形 (テンプレート)</label>
-					<textarea id="tagTemplateInput" rows="8" placeholder='例: &lt;p class="custom"&gt;[TEXT]&lt;/p&gt;'></textarea>
+					<textarea id="tagTemplateInput" rows="8" placeholder='例: &lt;div class="content"&gt;[TEXT]&lt;/div&gt; または &lt;ul&gt;[TEXT_LIST]&lt;/ul&gt; など'></textarea>
 					<p style="font-size: 0.8em; color: #666; margin-top: -10px">
-						※タグタイプに合わせて、[TEXT], [URL], [TEXT_P], [TEXT_LIST], [LINK_LIST] を使用できます。
+						※モード別プレースホルダー: 1.[TEXT] / 2.[TEXT_P], [TEXT_P_1], [TEXT_LIST](任意) / 3.[LINK_LIST] / 4.なし / 5.[TEXT], [URL] / 6.[CODE]
 					</p>
 
 					<div id="linkItemTemplateSection" style="display: none">
 						<label for="linkItemTemplateInput">リンク項目の雛形 (link-list用)</label>
-						<textarea id="linkItemTemplateInput" rows="4" placeholder='例: &lt;li class="rtoc-item"&gt;&lt;a href="[URL]"&gt;[TEXT]&lt;/a&gt;&lt;/li&gt;'></textarea>
+						<textarea id="linkItemTemplateInput" rows="4" placeholder='例: &lt;li&gt;&lt;a href="[URL]"&gt;[TEXT]&lt;/a&gt;&lt;/li&gt;'></textarea>
 						<p style="font-size: 0.8em; color: #666; margin-top: -10px">
-							※繰り返される各リンク項目の形式を [URL] と [TEXT] を使って定義します。
+							※モード3専用：各リンク項目（[TEXT](URL)形式）を個別に変換するテンプレート。[TEXT]と[URL]を使用。
 						</p>
 					</div>
 
@@ -132,7 +135,7 @@
 						<label for="listItemTemplateInput">リスト項目の雛形 (p-list用)</label>
 						<textarea id="listItemTemplateInput" rows="4" placeholder='例: &lt;li&gt;[TEXT]&lt;/li&gt;'></textarea>
 						<p style="font-size: 0.8em; color: #666; margin-top: -10px">
-							※繰り返される各リスト項目の形式を [TEXT] を使って定義します。
+							※モード2専用：「-」または「*」で始まる行をリスト項目に変換するテンプレート。[TEXT]を使用。
 						</p>
 					</div>
 

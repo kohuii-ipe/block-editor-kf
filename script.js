@@ -62,7 +62,8 @@ document.addEventListener("DOMContentLoaded", function () {
 		closeModalSpan: null, // 後で初期化
 
 		// 書式マッピング管理
-		formattingList: document.getElementById("formattingList")
+		formattingList: document.getElementById("formattingList"),
+		saveFormattingButton: document.getElementById("saveFormattingButton")
 	};
 
 	// closeModalSpanは依存関係があるため後で設定
@@ -77,7 +78,7 @@ document.addEventListener("DOMContentLoaded", function () {
 		modalTitle, tagModalForm, tagIdInput, tagNameInput, tagTypeSelector,
 		tagTemplateInput, linkItemTemplateSection, linkItemTemplateInput,
 		listItemTemplateSection, listItemTemplateInput,
-		removeLastBrInput, closeModalSpan, formattingList
+		removeLastBrInput, closeModalSpan, formattingList, saveFormattingButton
 	} = DOM;
 
 	// ========================================
@@ -258,9 +259,11 @@ document.addEventListener("DOMContentLoaded", function () {
 			'single': ['[TEXT]'],
 			'list': ['[TEXT]'],
 			'link': ['[TEXT]', '[URL]'],
-			'p-list': ['[TEXT_LIST]'],
+			'p-list': [], // [TEXT_LIST] はオプション
 			'link-list': ['[LINK_LIST]'],
-			'static': [] // 静的モードはプレースホルダー不要
+			'single-link': ['[TEXT]', '[URL]'],
+			'static': [], // 静的モードはプレースホルダー不要
+			'code': ['[CODE]'] // コードモードは[CODE]が必須
 		};
 
 		const required = requiredPlaceholders[tagType] || [];
@@ -526,6 +529,9 @@ document.addEventListener("DOMContentLoaded", function () {
 		}
 	};
 
+	// デバウンスされた書式マッピング保存関数（入力中のパフォーマンス向上）
+	const debouncedSaveFormattingMap = debounce(saveFormattingMap, CONSTANTS.DEBOUNCE_DELAY);
+
 	const loadFormattingMap = () => {
 		const patternId = getSelectedPatternId();
 		const currentPattern = patterns[patternId];
@@ -711,7 +717,7 @@ document.addEventListener("DOMContentLoaded", function () {
 				formattingMap[type].template = newTemplate;
 				// 後方互換性のため tag プロパティも削除
 				delete formattingMap[type].tag;
-				saveFormattingMap();
+				// 手動保存に変更（自動保存を削除）
 			});
 
 			item.appendChild(label);
@@ -719,6 +725,14 @@ document.addEventListener("DOMContentLoaded", function () {
 			formattingList.appendChild(item);
 		});
 	};
+
+	// 書式マッピング保存ボタンのイベントリスナー
+	if (saveFormattingButton) {
+		saveFormattingButton.addEventListener("click", () => {
+			saveFormattingMap();
+			alert("書式マッピングを保存しました。");
+		});
+	}
 
 	const loadAllPatterns = () => {
 		try {
@@ -1078,10 +1092,16 @@ document.addEventListener("DOMContentLoaded", function () {
 				placeholder = '例:\n<div>\n<p>[TEXT_P_1]</p>\n<p>[TEXT_P_2]</p>\n<ul>\n[TEXT_LIST]\n</ul>\n</div>\n\n【段落+リストモード】\n※通常の行: [TEXT_P_1], [TEXT_P_2]として段落に変換\n※「-」または「*」で始まる行: [TEXT_LIST]として箇条書きに変換';
 				break;
 			case "link-list":
-				placeholder = '例:\n<div class="wrapper">\n<ul>\n[LINK_LIST]\n</ul>\n</div>\n\n【リンクリストモード】\n※[LINK_LIST]の位置に複数のリンク項目が挿入されます\n※下の「リンク項目の雛形」で各リンクの形式を指定します';
+				placeholder = '例:\n<div class="wrapper">\n<ul>\n[LINK_LIST]\n</ul>\n</div>\n\n【リンクリストモード】\n※Markdown形式で各行にリンクを記述: [リンクテキスト](URL)\n※[LINK_LIST]の位置に複数のリンク項目が挿入されます\n※下の「リンク項目の雛形」で各リンクの形式を指定します';
 				break;
 			case "static":
 				placeholder = '【静的モード】\n※テンプレート欄に入力したHTMLがそのまま出力されます\n※入力エリアは無効化されます（入力不可）\n※固定のHTMLブロックや定型文を出力するのに便利です\n\n例:\n<div class="alert">\n<p>このメッセージは固定です</p>\n</div>';
+				break;
+			case "single-link":
+				placeholder = '例: <a href="[URL]" class="btn">[TEXT]</a>\n\n【単一リンクモード】\n※Markdown形式でリンクを埋め込みます: [リンクテキスト](URL)\n※例: クリック[こちら](https://example.com)してください\n※[TEXT]にはリンクテキスト、[URL]にはURLが入ります';
+				break;
+			case "code":
+				placeholder = '例:\n<pre><code>[CODE]</code></pre>\n\n【コードモード】\n※入力エリアに貼り付けたコードがそのまま出力されます\n※[CODE]の位置にコード内容が挿入されます\n※HTMLタグなどもそのまま表示されます（エスケープなし）';
 				break;
 			default:
 				placeholder = "[TEXT] を使って雛形を入力";
@@ -1467,7 +1487,15 @@ document.addEventListener("DOMContentLoaded", function () {
 		};
 
 		let text = "";
-		for (let child of tempDiv.childNodes) {
+		for (let i = 0; i < tempDiv.childNodes.length; i++) {
+			const child = tempDiv.childNodes[i];
+			// block要素の前に改行を追加（最初の要素以外で、既にテキストがある場合）
+			if (i > 0 && child.nodeType === Node.ELEMENT_NODE) {
+				const tagName = child.tagName.toLowerCase();
+				if (["div", "p"].includes(tagName) && text.length > 0 && !text.endsWith("\n")) {
+					text += "\n";
+				}
+			}
 			text += processNode(child);
 		}
 
@@ -1480,14 +1508,27 @@ document.addEventListener("DOMContentLoaded", function () {
 	function getPlainTextWithLineBreaks(htmlContent) {
 		// XSS対策: 入力HTMLをサニタイズ
 		const sanitizedContent = sanitizeHTML(htmlContent);
+
+		// HTMLを文字列として処理し、<div>と<br>を改行に変換
+		let processedHTML = sanitizedContent;
+
+		// <div>タグを改行に変換（contenteditable で Enter を押すと <div> が生成される）
+		processedHTML = processedHTML.replace(/<div[^>]*>/gi, '\n');
+		processedHTML = processedHTML.replace(/<\/div>/gi, '');
+
+		// <br> タグを改行に変換
+		processedHTML = processedHTML.replace(/<br\s*\/?>/gi, '\n');
+
 		const tempDiv = document.createElement("div");
-		tempDiv.innerHTML = sanitizedContent;
+		tempDiv.innerHTML = processedHTML;
 
-		// innerText を使用すると、ブラウザが自動的に<br>やblock要素を改行に変換してくれる
-		let text = tempDiv.innerText || tempDiv.textContent || "";
+		// textContent を使用してプレーンテキストを取得
+		let text = tempDiv.textContent || "";
 
-		// 末尾の余分な改行を削除
-		return text.replace(/\n+$/, "");
+		// 連続する改行を1つにまとめ、末尾の余分な改行を削除
+		text = text.replace(/\n{2,}/g, '\n').replace(/^\n+/, '').replace(/\n+$/, "");
+
+		return text;
 	}
 
 	// HTML出力をクリーンアップする関数（重複タグの統合と空タグの削除）
@@ -1572,8 +1613,8 @@ document.addEventListener("DOMContentLoaded", function () {
 		// 静的モード以外では、入力が空の場合は空文字を返す
 		if (!htmlContent || htmlContent.trim() === "") return "";
 
-		// link-list モードの場合はプレーンテキストを取得、それ以外は書式を保持
-		const text = (tagInfo.tagType === "link-list")
+		// link-list, single-link, code モードの場合はプレーンテキストを取得、それ以外は書式を保持
+		const text = (tagInfo.tagType === "link-list" || tagInfo.tagType === "single-link" || tagInfo.tagType === "code")
 			? getPlainTextWithLineBreaks(htmlContent)
 			: getTextWithLineBreaks(htmlContent);
 
@@ -1644,8 +1685,12 @@ document.addEventListener("DOMContentLoaded", function () {
 			// テンプレートから開始
 			output = templateString;
 
-			// [TEXT_LIST] の置換
-			output = output.replace(/\[TEXT_LIST\]/g, listContent);
+			// [TEXT_LIST] がテンプレートに含まれている場合のみ置換
+			const hasTextListPlaceholder = templateString.includes('[TEXT_LIST]');
+			if (hasTextListPlaceholder) {
+				// [TEXT_LIST] の置換
+				output = output.replace(/\[TEXT_LIST\]/g, listContent);
+			}
 
 			// [TEXT_P_1], [TEXT_P_2], ... の置換（番号付き段落プレースホルダー）
 			paragraphLines.forEach((pLine, index) => {
@@ -1706,28 +1751,56 @@ document.addEventListener("DOMContentLoaded", function () {
 			} else {
 				output = `<!-- 警告: テキストが入力されていません -->\n`;
 			}
+		} else if (tagType === "single-link") {
+			// 単一リンクの処理 (single-link)
+			// Markdown形式 [リンクテキスト](URL) でリンクを抽出
+			const linkPattern = /\[([^\]]+)\]\(([^\)]+)\)/;
+			const match = text.match(linkPattern);
+
+			if (match) {
+				const linkText = match[1]; // リンクテキストを抽出
+				const linkUrl = match[2]; // URLを抽出
+
+				// [TEXT]と[URL]を置換
+				output = templateString
+					.replace(/\[TEXT\]/g, linkText)
+					.replace(/\[URL\]/g, linkUrl);
+
+				// 最後の項目から <br> を削除するオプション
+				if (tagInfo.removeLastBr) {
+					output = output.replace(/<br\s*\/?\s*>\s*$/i, '').trimEnd();
+				}
+			} else {
+				output = `<!-- 警告: [リンクテキスト](URL)の形式でリンクを指定してください。例: クリック[こちら](https://example.com)してください -->\n`;
+			}
 		} else if (tagType === "link-list") {
 			// リンクリストの処理 (link-list)
+			// Markdown形式 [リンクテキスト](URL) で各行を処理
 			const lines = text.trim().split("\n").map((line) => line.trim()).filter((line) => line !== "");
 			const linkItems = [];
 
 			// カスタムリンク項目テンプレートを取得（デフォルト値を設定）
 			const linkItemTemplate = tagInfo.linkItemTemplate || '<li class="rtoc-item"><a href="[URL]">[TEXT]</a></li>';
 
-			// 2行ずつペアにして処理 (奇数行:TEXT, 偶数行:URL)
-			for (let i = 0; i < lines.length; i += 2) {
-				const linkText = lines[i] || "";
-				const linkUrl = lines[i + 1] || "";
+			// Markdown形式のリンクパターン
+			const linkPattern = /\[([^\]]+)\]\(([^\)]+)\)/;
 
-				if (linkText && linkUrl) {
+			// 各行をMarkdown形式で処理
+			lines.forEach((line) => {
+				const match = line.match(linkPattern);
+
+				if (match) {
+					const linkText = match[1]; // リンクテキストを抽出
+					const linkUrl = match[2]; // URLを抽出
+
 					// カスタムテンプレートを使用して変換
 					const itemHtml = linkItemTemplate.replace(/\[TEXT\]/g, linkText).replace(/\[URL\]/g, linkUrl);
 					linkItems.push(itemHtml);
-				} else if (linkText) {
-					// URLがない場合は警告
-					linkItems.push(`<!-- 警告: "${linkText}" のURLが指定されていません -->`);
+				} else if (line) {
+					// Markdown形式でない場合は警告
+					linkItems.push(`<!-- 警告: "${line}" はMarkdown形式ではありません。[テキスト](URL)の形式で入力してください -->`);
 				}
-			}
+			});
 
 			// 最後の項目から <br> または <br /> を削除するオプション
 			if (tagInfo.removeLastBr && linkItems.length > 0) {
@@ -1744,6 +1817,17 @@ document.addEventListener("DOMContentLoaded", function () {
 			}
 
 			output = templateString.replace(/\[LINK_LIST\]/g, linkListContent.trim());
+		} else if (tagType === "code") {
+			// コードモードの処理 (code)
+			// テキストをそのまま出力（エスケープなし）
+
+			// [CODE]プレースホルダーを置換
+			output = templateString.replace(/\[CODE\]/g, text);
+
+			// 最後の項目から <br> を削除するオプション
+			if (tagInfo.removeLastBr) {
+				output = output.replace(/<br\s*\/?\s*>\s*$/i, '').trimEnd();
+			}
 		}
 
 		// HTML出力をクリーンアップ（重複タグの統合と空タグの削除）
@@ -2132,9 +2216,13 @@ document.addEventListener("DOMContentLoaded", function () {
 		} else if (tagType === "p-list") {
 			placeholderText = `【${tagName}】段落+リストモード：通常の行は段落、「-」または「*」で始まる行はリスト項目になります`;
 		} else if (tagType === "link-list") {
-			placeholderText = `【${tagName}】リンクリストモード：奇数行にリンクテキスト、偶数行にURLを交互に入力してください`;
+			placeholderText = `【${tagName}】リンクリストモード：各行に[リンクテキスト](URL)の形式で入力してください`;
+		} else if (tagType === "single-link") {
+			placeholderText = `【${tagName}】単一リンクモード：[リンクテキスト](URL)の形式で指定。例：クリック[こちら](https://example.com)してください`;
 		} else if (tagType === "static") {
 			placeholderText = `【${tagName}】静的モード：テンプレートで設定した内容がそのまま出力されます（入力不可）`;
+		} else if (tagType === "code") {
+			placeholderText = `【${tagName}】コードモード：コードを貼り付けてください。HTML特殊文字（<, >, &など）は自動的にエスケープされます`;
 		} else {
 			// 古いモード (single, list, link) のための後方互換性
 			placeholderText = `${tagName}エリア。テキストを入力してください。`;
