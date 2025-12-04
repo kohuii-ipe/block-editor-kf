@@ -60,6 +60,7 @@ document.addEventListener("DOMContentLoaded", function () {
 		listItemTemplateSection: document.getElementById("listItemTemplateSection"),
 		listItemTemplateInput: document.getElementById("listItemTemplateInput"),
 		removeLastBrInput: document.getElementById("removeLastBrInput"),
+		allowScriptTagsInput: document.getElementById("allowScriptTagsInput"),
 		closeModalSpan: null, // 後で初期化
 
 		// 書式マッピング管理
@@ -107,7 +108,7 @@ document.addEventListener("DOMContentLoaded", function () {
 		modalTitle, tagModalForm, tagIdInput, tagNameInput, tagTypeSelector,
 		tagTemplateInput, linkItemTemplateSection, linkItemTemplateInput,
 		listItemTemplateSection, listItemTemplateInput,
-		removeLastBrInput, closeModalSpan, formattingList, saveFormattingButton,
+		removeLastBrInput, allowScriptTagsInput, closeModalSpan, formattingList, saveFormattingButton,
 		exportDataButton, importDataButton, importFileInput,
 		exportModal, exportModalForm, exportPatternSelector, exportAllPatternsCheckbox,
 		exportWithPasswordCheckbox, exportPasswordSection, exportPasswordInput, exportPasswordConfirmInput,
@@ -297,10 +298,11 @@ document.addEventListener("DOMContentLoaded", function () {
 	/**
 	 * テンプレート文字列を検証する関数
 	 * @param {string} template - 検証するテンプレート
-	 * @param {string} tagType - タグタイプ (multi, p-list, link-list など)
+	 * @param {string} tagType - タグタイプ (multi, p-list, link など)
+	 * @param {boolean} allowScriptTags - scriptタグや危険な要素を許可するかどうか
 	 * @returns {Object} { valid: boolean, error: string }
 	 */
-	const validateTemplate = (template, tagType) => {
+	const validateTemplate = (template, tagType, allowScriptTags = false) => {
 		// 空のテンプレートチェック（静的モードも含む）
 		if (!template || typeof template !== 'string' || template.trim() === '') {
 			return { valid: false, error: 'テンプレートが空です。雛形を入力してください。' };
@@ -316,40 +318,57 @@ document.addEventListener("DOMContentLoaded", function () {
 			'multi': ['[TEXT]'],
 			'single': ['[TEXT]'],
 			'list': ['[TEXT]'],
-			'link': ['[TEXT]', '[URL]'],
+			'link': [], // 新しい統合リンクモード: [TEXT]+[URL] または [LINK_LIST] のいずれかが必要
 			'p-list': [], // [TEXT_LIST] はオプション
-			'link-list': ['[LINK_LIST]'],
-			'single-link': ['[TEXT]', '[URL]'],
+			'link-list': ['[LINK_LIST]'], // 後方互換性
+			'single-link': ['[TEXT]', '[URL]'], // 後方互換性
 			'static': [], // 静的モードはプレースホルダー不要
 			'code': ['[CODE]'] // コードモードは[CODE]が必須
 		};
 
 		const required = requiredPlaceholders[tagType] || [];
-		for (const placeholder of required) {
-			if (!template.includes(placeholder)) {
+
+		// 統合リンクモードの特別な検証
+		if (tagType === 'link') {
+			const hasSingleLinkPlaceholders = template.includes('[TEXT]') && template.includes('[URL]');
+			const hasMultiLinkPlaceholder = template.includes('[LINK_LIST]');
+
+			if (!hasSingleLinkPlaceholders && !hasMultiLinkPlaceholder) {
 				return {
 					valid: false,
-					error: `テンプレートに必須のプレースホルダー「${placeholder}」が含まれていません。`
+					error: 'リンクモードでは [TEXT]と[URL] のセット、または [LINK_LIST] のいずれかが必要です。'
 				};
+			}
+		} else {
+			// その他のモードは通常の検証
+			for (const placeholder of required) {
+				if (!template.includes(placeholder)) {
+					return {
+						valid: false,
+						error: `テンプレートに必須のプレースホルダー「${placeholder}」が含まれていません。`
+					};
+				}
 			}
 		}
 
-		// 危険なパターンのチェック
-		const dangerousPatterns = [
-			{ pattern: /<script[\s\S]*?>[\s\S]*?<\/script>/gi, name: 'scriptタグ' },
-			{ pattern: /javascript:/gi, name: 'javascriptプロトコル' },
-			{ pattern: /on\w+\s*=/gi, name: 'イベントハンドラ (onclick等)' },
-			{ pattern: /<iframe/gi, name: 'iframeタグ' },
-			{ pattern: /<embed/gi, name: 'embedタグ' },
-			{ pattern: /<object/gi, name: 'objectタグ' }
-		];
+		// 危険なパターンのチェック（allowScriptTagsがfalseの場合のみ）
+		if (!allowScriptTags) {
+			const dangerousPatterns = [
+				{ pattern: /<script[\s\S]*?>[\s\S]*?<\/script>/gi, name: 'scriptタグ' },
+				{ pattern: /javascript:/gi, name: 'javascriptプロトコル' },
+				{ pattern: /on\w+\s*=/gi, name: 'イベントハンドラ (onclick等)' },
+				{ pattern: /<iframe/gi, name: 'iframeタグ' },
+				{ pattern: /<embed/gi, name: 'embedタグ' },
+				{ pattern: /<object/gi, name: 'objectタグ' }
+			];
 
-		for (const { pattern, name } of dangerousPatterns) {
-			if (pattern.test(template)) {
-				return {
-					valid: false,
-					error: `テンプレートに危険な要素（${name}）が含まれています。`
-				};
+			for (const { pattern, name } of dangerousPatterns) {
+				if (pattern.test(template)) {
+					return {
+						valid: false,
+						error: `テンプレートに危険な要素（${name}）が含まれています。セキュリティリスクを理解した上で使用する場合は、「危険な要素を許可する」オプションをチェックしてください。`
+					};
+				}
 			}
 		}
 
@@ -1152,6 +1171,7 @@ document.addEventListener("DOMContentLoaded", function () {
 			linkItemTemplateInput.value = button.linkItemTemplate || '<li class="rtoc-item"><a href="[URL]">[TEXT]</a></li>';
 			listItemTemplateInput.value = button.listItemTemplate || '<li>[TEXT]</li>';
 			removeLastBrInput.checked = button.removeLastBr || false;
+			allowScriptTagsInput.checked = button.allowScriptTags || false;
 		} else {
 			// 新規追加モード
 			modalTitle.textContent = "新しいタグボタンの追加";
@@ -1162,6 +1182,7 @@ document.addEventListener("DOMContentLoaded", function () {
 			linkItemTemplateInput.value = '<li class="rtoc-item"><a href="[URL]">[TEXT]</a></li>';
 			listItemTemplateInput.value = '<li>[TEXT]</li>';
 			removeLastBrInput.checked = false;
+			allowScriptTagsInput.checked = false;
 		}
 
 		// モーダル表示時にプレースホルダーを更新
@@ -1191,8 +1212,8 @@ document.addEventListener("DOMContentLoaded", function () {
 		const selectedType = tagTypeSelector.value;
 		let placeholder = "";
 
-		// link-list用のフィールドの表示/非表示を切り替え
-		if (selectedType === "link-list") {
+		// link用のフィールドの表示/非表示を切り替え（後方互換性も考慮）
+		if (selectedType === "link" || selectedType === "link-list") {
 			linkItemTemplateSection.style.display = "block";
 		} else {
 			linkItemTemplateSection.style.display = "none";
@@ -1212,14 +1233,13 @@ document.addEventListener("DOMContentLoaded", function () {
 			case "p-list":
 				placeholder = '例:\n<div>\n<p>[TEXT_P_1]</p>\n<p>[TEXT_P_2]</p>\n<ul>\n[TEXT_LIST]\n</ul>\n</div>\n\n【段落+リストモード】\n※通常の行: [TEXT_P_1], [TEXT_P_2]として段落に変換\n※「-」または「*」で始まる行: [TEXT_LIST]として箇条書きに変換';
 				break;
-			case "link-list":
-				placeholder = '例:\n<div class="wrapper">\n<ul>\n[LINK_LIST]\n</ul>\n</div>\n\n【リンクリストモード】\n※Markdown形式で各行にリンクを記述: [リンクテキスト](URL)\n※[LINK_LIST]の位置に複数のリンク項目が挿入されます\n※下の「リンク項目の雛形」で各リンクの形式を指定します';
+			case "link":
+			case "link-list":  // 後方互換性
+			case "single-link":  // 後方互換性
+				placeholder = '例（単一）: <a href="[URL]" class="btn">[TEXT]</a>\n例（複数）: <ul>[LINK_LIST]</ul>\n\n【リンクモード】\n※Markdown形式でリンクを記述: [リンクテキスト](URL)\n※1つのリンク: [TEXT]と[URL]を使用\n※複数のリンク: [LINK_LIST]を使用（下の「リンク項目の雛形」も設定）\n※自動的にリンク数を検出して適切に変換します';
 				break;
 			case "static":
 				placeholder = '【静的モード】\n※テンプレート欄に入力したHTMLがそのまま出力されます\n※入力エリアは無効化されます（入力不可）\n※固定のHTMLブロックや定型文を出力するのに便利です\n\n例:\n<div class="alert">\n<p>このメッセージは固定です</p>\n</div>';
-				break;
-			case "single-link":
-				placeholder = '例: <a href="[URL]" class="btn">[TEXT]</a>\n\n【単一リンクモード】\n※Markdown形式でリンクを埋め込みます: [リンクテキスト](URL)\n※例: クリック[こちら](https://example.com)してください\n※[TEXT]にはリンクテキスト、[URL]にはURLが入ります';
 				break;
 			case "code":
 				placeholder = '例:\n<pre><code>[CODE]</code></pre>\n\n【コードモード】\n※入力エリアに貼り付けたコードがそのまま出力されます\n※[CODE]の位置にコード内容が挿入されます\n※HTMLタグなどもそのまま表示されます（エスケープなし）';
@@ -1248,6 +1268,7 @@ document.addEventListener("DOMContentLoaded", function () {
 		const newLinkItemTemplate = linkItemTemplateInput.value;
 		const newListItemTemplate = listItemTemplateInput.value;
 		const newRemoveLastBr = removeLastBrInput.checked;
+		const newAllowScriptTags = allowScriptTagsInput.checked;
 
 		// 入力検証: ボタン名が空でないかチェック
 		if (!newName) {
@@ -1256,7 +1277,7 @@ document.addEventListener("DOMContentLoaded", function () {
 		}
 
 		// 入力検証: テンプレートの検証
-		const templateValidation = validateTemplate(newTemplate, newType);
+		const templateValidation = validateTemplate(newTemplate, newType, newAllowScriptTags);
 		if (!templateValidation.valid) {
 			alert('テンプレートエラー:\n' + templateValidation.error);
 			return;
@@ -1264,7 +1285,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
 		// link-listモードの場合、linkItemTemplateも検証
 		if (newType === 'link-list' && newLinkItemTemplate) {
-			const linkItemValidation = validateTemplate(newLinkItemTemplate, 'link');
+			const linkItemValidation = validateTemplate(newLinkItemTemplate, 'link', newAllowScriptTags);
 			if (!linkItemValidation.valid) {
 				alert('リンク項目の雛形エラー:\n' + linkItemValidation.error);
 				return;
@@ -1273,7 +1294,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
 		// p-listモードの場合、listItemTemplateも検証
 		if (newType === 'p-list' && newListItemTemplate) {
-			const listItemValidation = validateTemplate(newListItemTemplate, 'multi');
+			const listItemValidation = validateTemplate(newListItemTemplate, 'multi', newAllowScriptTags);
 			if (!listItemValidation.valid) {
 				alert('リスト項目の雛形エラー:\n' + listItemValidation.error);
 				return;
@@ -1290,6 +1311,7 @@ document.addEventListener("DOMContentLoaded", function () {
 				button.linkItemTemplate = newLinkItemTemplate;
 				button.listItemTemplate = newListItemTemplate;
 				button.removeLastBr = newRemoveLastBr;
+				button.allowScriptTags = newAllowScriptTags;
 			}
 		} else {
 			// 新規追加
@@ -1303,6 +1325,7 @@ document.addEventListener("DOMContentLoaded", function () {
 				linkItemTemplate: newLinkItemTemplate,
 				listItemTemplate: newListItemTemplate,
 				removeLastBr: newRemoveLastBr,
+				allowScriptTags: newAllowScriptTags,
 			});
 		}
 
@@ -1736,8 +1759,8 @@ document.addEventListener("DOMContentLoaded", function () {
 		// 静的モード以外では、入力が空の場合は空文字を返す
 		if (!htmlContent || htmlContent.trim() === "") return "";
 
-		// link-list, single-link, code モードの場合はプレーンテキストを取得、それ以外は書式を保持
-		const text = (tagInfo.tagType === "link-list" || tagInfo.tagType === "single-link" || tagInfo.tagType === "code")
+		// link, link-list, single-link, code モードの場合はプレーンテキストを取得、それ以外は書式を保持
+		const text = (tagInfo.tagType === "link" || tagInfo.tagType === "link-list" || tagInfo.tagType === "single-link" || tagInfo.tagType === "code")
 			? getPlainTextWithLineBreaks(htmlContent)
 			: getTextWithLineBreaks(htmlContent);
 
@@ -1874,17 +1897,19 @@ document.addEventListener("DOMContentLoaded", function () {
 			} else {
 				output = `<!-- 警告: テキストが入力されていません -->\n`;
 			}
-		} else if (tagType === "single-link") {
-			// 単一リンクの処理 (single-link)
-			// Markdown形式 [リンクテキスト](URL) でリンクを抽出
-			const linkPattern = /\[([^\]]+)\]\(([^\)]+)\)/;
-			const match = text.match(linkPattern);
+		} else if (tagType === "link" || tagType === "single-link" || tagType === "link-list") {
+			// 統合リンクモードの処理 (link) - 自動検出で単一/複数リンクに対応
+			// 後方互換性のため "single-link" と "link-list" も受け付ける
+			const linkPattern = /\[([^\]]+)\]\(([^\)]+)\)/g;
+			const matches = [...text.matchAll(linkPattern)];
 
-			if (match) {
-				const linkText = match[1]; // リンクテキストを抽出
-				const linkUrl = match[2]; // URLを抽出
+			if (matches.length === 0) {
+				output = `<!-- 警告: [リンクテキスト](URL)の形式でリンクを指定してください。例: [こちら](https://example.com) -->\n`;
+			} else if (matches.length === 1) {
+				// 単一リンク: [TEXT]と[URL]を使用
+				const linkText = matches[0][1];
+				const linkUrl = matches[0][2];
 
-				// [TEXT]と[URL]を置換
 				output = templateString
 					.replace(/\[TEXT\]/g, linkText)
 					.replace(/\[URL\]/g, linkUrl);
@@ -1894,52 +1919,28 @@ document.addEventListener("DOMContentLoaded", function () {
 					output = output.replace(/<br\s*\/?\s*>\s*$/i, '').trimEnd();
 				}
 			} else {
-				output = `<!-- 警告: [リンクテキスト](URL)の形式でリンクを指定してください。例: クリック[こちら](https://example.com)してください -->\n`;
-			}
-		} else if (tagType === "link-list") {
-			// リンクリストの処理 (link-list)
-			// Markdown形式 [リンクテキスト](URL) で各行を処理
-			const lines = text.trim().split("\n").map((line) => line.trim()).filter((line) => line !== "");
-			const linkItems = [];
+				// 複数リンク: [LINK_LIST]を使用
+				const linkItems = [];
+				const linkItemTemplate = tagInfo.linkItemTemplate || '<li class="rtoc-item"><a href="[URL]">[TEXT]</a></li>';
 
-			// カスタムリンク項目テンプレートを取得（デフォルト値を設定）
-			const linkItemTemplate = tagInfo.linkItemTemplate || '<li class="rtoc-item"><a href="[URL]">[TEXT]</a></li>';
-
-			// Markdown形式のリンクパターン
-			const linkPattern = /\[([^\]]+)\]\(([^\)]+)\)/;
-
-			// 各行をMarkdown形式で処理
-			lines.forEach((line) => {
-				const match = line.match(linkPattern);
-
-				if (match) {
-					const linkText = match[1]; // リンクテキストを抽出
-					const linkUrl = match[2]; // URLを抽出
-
-					// カスタムテンプレートを使用して変換
-					const itemHtml = linkItemTemplate.replace(/\[TEXT\]/g, linkText).replace(/\[URL\]/g, linkUrl);
+				matches.forEach((match) => {
+					const linkText = match[1];
+					const linkUrl = match[2];
+					const itemHtml = linkItemTemplate
+						.replace(/\[TEXT\]/g, linkText)
+						.replace(/\[URL\]/g, linkUrl);
 					linkItems.push(itemHtml);
-				} else if (line) {
-					// Markdown形式でない場合は警告
-					linkItems.push(`<!-- 警告: "${line}" はMarkdown形式ではありません。[テキスト](URL)の形式で入力してください -->`);
+				});
+
+				// 最後の項目から <br> を削除するオプション
+				if (tagInfo.removeLastBr && linkItems.length > 0) {
+					const lastIndex = linkItems.length - 1;
+					linkItems[lastIndex] = linkItems[lastIndex].replace(/<br\s*\/?\s*>\s*$/i, '').trimEnd();
 				}
-			});
 
-			// 最後の項目から <br> または <br /> を削除するオプション
-			if (tagInfo.removeLastBr && linkItems.length > 0) {
-				const lastIndex = linkItems.length - 1;
-				// 末尾の <br> または <br /> とその後の空白を削除（大文字小文字・スペースの有無を考慮）
-				linkItems[lastIndex] = linkItems[lastIndex].replace(/<br\s*\/?\s*>\s*$/i, '').trimEnd();
+				const linkListContent = linkItems.join("\n");
+				output = templateString.replace(/\[LINK_LIST\]/g, linkListContent.trim());
 			}
-
-			let linkListContent = "";
-			if (linkItems.length > 0) {
-				linkListContent = linkItems.join("\n");
-			} else {
-				linkListContent = `<li class="rtoc-item">リンク項目がありません</li>`;
-			}
-
-			output = templateString.replace(/\[LINK_LIST\]/g, linkListContent.trim());
 		} else if (tagType === "code") {
 			// コードモードの処理 (code)
 			// テキストをそのまま出力（エスケープなし）
@@ -2677,14 +2678,14 @@ document.addEventListener("DOMContentLoaded", function () {
 
 				// テンプレートの検証（既存のvalidateTemplate関数を再利用）
 				// ★ 変更点: テンプレート検証の失敗を警告として扱い、インポートは続行可能にする
-				const validation = validateTemplate(button.template, button.tagType);
+				const validation = validateTemplate(button.template, button.tagType, button.allowScriptTags || false);
 				if (!validation.valid) {
 					// セキュリティ上危険なパターンの場合のみエラーとして拒否
 					const isDangerous = validation.error.includes('危険な要素');
 					if (isDangerous) {
 						return {
 							valid: false,
-							error: `パターン「${pattern.name}」のボタン「${button.name}」にセキュリティ上の問題があります。\n\n詳細: ${validation.error}\n\n対処法: エクスポート元で危険なコード（scriptタグなど）を削除してください。`,
+							error: `パターン「${pattern.name}」のボタン「${button.name}」にセキュリティ上の問題があります。\n\n詳細: ${validation.error}\n\n対処法: エクスポート元で危険なコード（scriptタグなど）を削除するか、「危険な要素を許可する」オプションを有効にしてください。`,
 							warnings: [],
 							patternCount: 0
 						};

@@ -125,10 +125,9 @@
 					<select id="tagTypeSelector">
 						<option value="multi">1. マルチラインモード - 各行が個別のタグに変換</option>
 						<option value="p-list">2. 段落+リストモード - テキストと箇条書きの組み合わせ</option>
-						<option value="link-list">3. リンクリストモード - 複数のリンクをリスト化（[テキスト](URL)形式）</option>
+						<option value="link">3. リンクモード - Markdownリンクを自動検出（1つ/複数に対応）</option>
 						<option value="static">4. 静的モード - テンプレートをそのまま出力（入力不可）</option>
-						<option value="single-link">5. 単一リンクモード - 1つのリンクを作成（[テキスト](URL)形式）</option>
-						<option value="code">6. コードモード - コードをHTMLエスケープして出力（<, >, &などを変換）</option>
+						<option value="code">5. コードモード - コードをHTMLエスケープして出力（<, >, &などを変換）</option>
 					</select>
 					<p style="font-size: 0.8em; color: #666; margin-top: -10px">
 						※入力エリアの動作（複数行の扱い、URLの取得など）を決定します。
@@ -137,14 +136,14 @@
 					<label for="tagTemplateInput">雛形 (テンプレート)</label>
 					<textarea id="tagTemplateInput" rows="8" placeholder='例: &lt;div class="content"&gt;[TEXT]&lt;/div&gt; または &lt;ul&gt;[TEXT_LIST]&lt;/ul&gt; など'></textarea>
 					<p style="font-size: 0.8em; color: #666; margin-top: -10px">
-						※モード別プレースホルダー: 1.[TEXT] / 2.[TEXT_P], [TEXT_P_1], [TEXT_LIST](任意) / 3.[LINK_LIST] / 4.なし / 5.[TEXT], [URL] / 6.[CODE]
+						※モード別プレースホルダー: 1.[TEXT] / 2.[TEXT_P], [TEXT_P_1], [TEXT_LIST](任意) / 3.[TEXT], [URL], [LINK_LIST] / 4.なし / 5.[CODE]
 					</p>
 
 					<div id="linkItemTemplateSection" style="display: none">
-						<label for="linkItemTemplateInput">リンク項目の雛形 (link-list用)</label>
+						<label for="linkItemTemplateInput">リンク項目の雛形 (link用)</label>
 						<textarea id="linkItemTemplateInput" rows="4" placeholder='例: &lt;li&gt;&lt;a href="[URL]"&gt;[TEXT]&lt;/a&gt;&lt;/li&gt;'></textarea>
 						<p style="font-size: 0.8em; color: #666; margin-top: -10px">
-							※モード3専用：各リンク項目（[TEXT](URL)形式）を個別に変換するテンプレート。[TEXT]と[URL]を使用。
+							※モード3専用：複数リンク時に各リンク項目（[TEXT](URL)形式）を個別に変換するテンプレート。[TEXT]と[URL]を使用。
 						</p>
 					</div>
 
@@ -163,6 +162,14 @@
 						</label>
 						<p style="font-size: 0.8em; color: #666; margin-top: 5px; margin-left: 24px;">
 							※チェックすると、最後の出力項目のみ末尾の改行タグが削除されます（全モード対応）。
+						</p>
+
+						<label style="display: flex; align-items: center; font-weight: normal; cursor: pointer; margin-top: 10px;">
+							<input type="checkbox" id="allowScriptTagsInput" style="width: auto; margin-right: 8px;">
+							<span>テンプレート内で &lt;script&gt; タグや危険な要素を許可する（上級者向け）</span>
+						</label>
+						<p style="font-size: 0.8em; color: #666; margin-top: 5px; margin-left: 24px;">
+							※チェックすると、&lt;script&gt;、イベントハンドラ（onclick等）、&lt;iframe&gt; などの要素を使用できます。セキュリティリスクを理解した上で使用してください。
 						</p>
 					</div>
 
