@@ -347,10 +347,15 @@ document.addEventListener("DOMContentLoaded", function () {
 		const wrapper = document.createElement('div');
 		wrapper.className = 'code-editor-wrapper';
 
-		// ハイライト表示用のdiv
+		// ハイライト表示用のdiv（内側コンテナを追加）
 		const highlightLayer = document.createElement('div');
 		highlightLayer.className = 'code-editor-highlight';
 		highlightLayer.setAttribute('aria-hidden', 'true');
+
+		// ハイライト内容を入れる内部div
+		const highlightContent = document.createElement('div');
+		highlightContent.className = 'code-editor-highlight-content';
+		highlightLayer.appendChild(highlightContent);
 
 		// 編集用のtextarea（透明にする）
 		textarea.classList.add('code-editor-input');
@@ -363,24 +368,25 @@ document.addEventListener("DOMContentLoaded", function () {
 		// 初期表示を更新
 		const updateHighlight = () => {
 			const code = textarea.value;
-			highlightLayer.innerHTML = highlightTemplateCode(code);
+			highlightContent.innerHTML = highlightTemplateCode(code);
+		};
 
-			// スクロール同期
-			highlightLayer.scrollTop = textarea.scrollTop;
-			highlightLayer.scrollLeft = textarea.scrollLeft;
+		// スクロール同期
+		const syncScroll = () => {
+			const scrollTop = textarea.scrollTop;
+			const scrollLeft = textarea.scrollLeft;
+			highlightContent.style.transform = `translate(${-scrollLeft}px, ${-scrollTop}px)`;
 		};
 
 		// 入力時にハイライトを更新
 		textarea.addEventListener('input', updateHighlight);
-		textarea.addEventListener('scroll', () => {
-			highlightLayer.scrollTop = textarea.scrollTop;
-			highlightLayer.scrollLeft = textarea.scrollLeft;
-		});
+		textarea.addEventListener('scroll', syncScroll);
 
 		// 初期表示
 		updateHighlight();
+		syncScroll();
 
-		return { wrapper, highlightLayer, updateHighlight };
+		return { wrapper, highlightLayer, highlightContent, updateHighlight };
 	};
 
 	// ========================================

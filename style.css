@@ -475,34 +475,44 @@ body {
 .code-editor-wrapper {
 	position: relative;
 	width: 95%;
+	min-height: 150px;
 	margin: 5px 0 15px 0;
 	border: 1px solid #ccc;
 	border-radius: 4px;
 	background-color: var(--syntax-bg);
-	overflow: hidden;
 }
 
 .code-editor-highlight {
 	position: absolute;
 	top: 0;
 	left: 0;
-	width: 100%;
-	height: 100%;
-	padding: 8px;
+	right: 0;
+	bottom: 0;
 	margin: 0;
+	overflow: hidden;
+	pointer-events: none;
+	box-sizing: border-box;
+	z-index: 1;
+}
+
+.code-editor-highlight-content {
+	padding: 8px;
 	color: var(--syntax-text);
 	font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
 	font-size: 14px;
 	line-height: 1.5;
 	white-space: pre-wrap;
 	word-wrap: break-word;
-	overflow: auto;
-	pointer-events: none;
 	box-sizing: border-box;
+	will-change: transform;
 }
 
 .code-editor-input {
-	position: relative;
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
 	width: 100%;
 	height: 100%;
 	padding: 8px;
@@ -517,14 +527,37 @@ body {
 	word-wrap: break-word;
 	border: none;
 	outline: none;
-	resize: vertical;
+	resize: none;
 	box-sizing: border-box;
+	overflow: auto;
+	z-index: 2;
 	-webkit-text-fill-color: transparent;
 }
 
+.code-editor-input::-webkit-scrollbar {
+	width: 12px;
+	height: 12px;
+}
+
+.code-editor-input::-webkit-scrollbar-track {
+	background: #1e1e1e;
+}
+
+.code-editor-input::-webkit-scrollbar-thumb {
+	background: #424242;
+	border-radius: 6px;
+}
+
+.code-editor-input::-webkit-scrollbar-thumb:hover {
+	background: #4e4e4e;
+}
+
 .code-editor-input::selection {
-	background-color: rgba(255, 255, 255, 0.2);
-	color: transparent;
+	background-color: rgba(100, 150, 255, 0.3);
+}
+
+.code-editor-input::-moz-selection {
+	background-color: rgba(100, 150, 255, 0.3);
 }
 
 /* シンタックスハイライトの色設定 */
