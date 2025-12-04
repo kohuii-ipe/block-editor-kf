@@ -291,6 +291,99 @@ document.addEventListener("DOMContentLoaded", function () {
 	};
 
 	// ========================================
+	// 3.5. テンプレートエディタのシンタックスハイライト
+	// ========================================
+
+	/**
+	 * テンプレート文字列にシンタックスハイライトを適用
+	 * @param {string} code - ハイライトする文字列
+	 * @returns {string} ハイライト用のHTML
+	 */
+	const highlightTemplateCode = (code) => {
+		// エスケープ処理
+		const escapeHtml = (str) => {
+			const div = document.createElement('div');
+			div.textContent = str;
+			return div.innerHTML;
+		};
+
+		let highlighted = escapeHtml(code);
+
+		// プレースホルダーをハイライト ([TEXT], [URL], [CODE]など)
+		highlighted = highlighted.replace(
+			/(\[TEXT_P_\d+\]|\[TEXT_P\]|\[TEXT_LIST\]|\[LINK_LIST\]|\[TEXT\]|\[URL\]|\[CODE\])/g,
+			'<span class="template-placeholder">$1</span>'
+		);
+
+		// HTML タグをハイライト
+		highlighted = highlighted.replace(
+			/&lt;(\/?)([\w-]+)((?:\s+[\w-]+(?:="[^"]*")?)*)\s*(\/?)\s*&gt;/g,
+			(match, slash1, tagName, attrs, slash2) => {
+				let result = '&lt;';
+				result += `<span class="template-tag">${slash1}${tagName}</span>`;
+
+				// 属性のハイライト
+				if (attrs) {
+					result += attrs.replace(
+						/([\w-]+)="([^"]*)"/g,
+						'<span class="template-attr-name">$1</span>=<span class="template-attr-value">"$2"</span>'
+					);
+				}
+
+				result += slash2 + '&gt;';
+				return result;
+			}
+		);
+
+		return highlighted;
+	};
+
+	/**
+	 * コードエディタを作成（シンタックスハイライト付き）
+	 * @param {HTMLTextAreaElement} textarea - 対象のtextarea要素
+	 */
+	const createCodeEditor = (textarea) => {
+		// エディタ用のラッパーを作成
+		const wrapper = document.createElement('div');
+		wrapper.className = 'code-editor-wrapper';
+
+		// ハイライト表示用のdiv
+		const highlightLayer = document.createElement('div');
+		highlightLayer.className = 'code-editor-highlight';
+		highlightLayer.setAttribute('aria-hidden', 'true');
+
+		// 編集用のtextarea（透明にする）
+		textarea.classList.add('code-editor-input');
+
+		// textareaの親要素に挿入
+		textarea.parentNode.insertBefore(wrapper, textarea);
+		wrapper.appendChild(highlightLayer);
+		wrapper.appendChild(textarea);
+
+		// 初期表示を更新
+		const updateHighlight = () => {
+			const code = textarea.value;
+			highlightLayer.innerHTML = highlightTemplateCode(code);
+
+			// スクロール同期
+			highlightLayer.scrollTop = textarea.scrollTop;
+			highlightLayer.scrollLeft = textarea.scrollLeft;
+		};
+
+		// 入力時にハイライトを更新
+		textarea.addEventListener('input', updateHighlight);
+		textarea.addEventListener('scroll', () => {
+			highlightLayer.scrollTop = textarea.scrollTop;
+			highlightLayer.scrollLeft = textarea.scrollLeft;
+		});
+
+		// 初期表示
+		updateHighlight();
+
+		return { wrapper, highlightLayer, updateHighlight };
+	};
+
+	// ========================================
 	// 4. セキュリティ関連（サニタイズ・バリデーション）
 	// ========================================
 
@@ -1166,6 +1259,15 @@ document.addEventListener("DOMContentLoaded", function () {
 
 		// モーダル表示時にプレースホルダーを更新
 		updateTemplatePlaceholder();
+
+		// シンタックスハイライトを更新（値が設定された後）
+		setTimeout(() => {
+			if (window.templateEditors) {
+				window.templateEditors.main.updateHighlight();
+				window.templateEditors.linkItem.updateHighlight();
+				window.templateEditors.listItem.updateHighlight();
+			}
+		}, 10);
 	};
 
 	// モーダルの閉じる処理
@@ -2544,6 +2646,12 @@ document.addEventListener("DOMContentLoaded", function () {
 	buildFormattingUI(); // 書式マッピング管理UIを初期表示
 	rebuildTagButtonList(); // タグボタン管理一覧を初期表示
 	loadInputAreas(); // 入力エリアを復元
+
+	// シンタックスハイライト付きコードエディタを初期化
+	window.templateEditors = {};
+	window.templateEditors.main = createCodeEditor(tagTemplateInput);
+	window.templateEditors.linkItem = createCodeEditor(linkItemTemplateInput);
+	window.templateEditors.listItem = createCodeEditor(listItemTemplateInput);
 
 	// 一括変換機能
 	if (convertAllButton) {

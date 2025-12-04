@@ -32,6 +32,14 @@
 	--color-link: #0066cc;
 	--color-danger: red;
 
+	/* Syntax Highlighting Colors (VS Code inspired) */
+	--syntax-tag: #569cd6;        /* HTML tags - blue */
+	--syntax-attr-name: #9cdcfe;  /* Attribute names - light blue */
+	--syntax-attr-value: #ce9178; /* Attribute values - orange */
+	--syntax-placeholder: #c586c0; /* Placeholders like [TEXT] - purple */
+	--syntax-bg: #1e1e1e;         /* Editor background - dark */
+	--syntax-text: #d4d4d4;       /* Default text - light gray */
+
 	/* Spacing */
 	--spacing-xs: 5px;
 	--spacing-sm: 10px;
@@ -461,6 +469,83 @@ body {
 	border: 1px solid #ccc;
 	border-radius: 4px;
 	box-sizing: border-box;
+}
+
+/* コードエディタのスタイル（シンタックスハイライト付き） */
+.code-editor-wrapper {
+	position: relative;
+	width: 95%;
+	margin: 5px 0 15px 0;
+	border: 1px solid #ccc;
+	border-radius: 4px;
+	background-color: var(--syntax-bg);
+	overflow: hidden;
+}
+
+.code-editor-highlight {
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
+	padding: 8px;
+	margin: 0;
+	color: var(--syntax-text);
+	font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+	font-size: 14px;
+	line-height: 1.5;
+	white-space: pre-wrap;
+	word-wrap: break-word;
+	overflow: auto;
+	pointer-events: none;
+	box-sizing: border-box;
+}
+
+.code-editor-input {
+	position: relative;
+	width: 100%;
+	height: 100%;
+	padding: 8px;
+	margin: 0;
+	color: transparent;
+	caret-color: white;
+	background: transparent;
+	font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+	font-size: 14px;
+	line-height: 1.5;
+	white-space: pre-wrap;
+	word-wrap: break-word;
+	border: none;
+	outline: none;
+	resize: vertical;
+	box-sizing: border-box;
+	-webkit-text-fill-color: transparent;
+}
+
+.code-editor-input::selection {
+	background-color: rgba(255, 255, 255, 0.2);
+	color: transparent;
+}
+
+/* シンタックスハイライトの色設定 */
+.template-tag {
+	color: var(--syntax-tag);
+	font-weight: normal;
+}
+
+.template-attr-name {
+	color: var(--syntax-attr-name);
+	font-weight: normal;
+}
+
+.template-attr-value {
+	color: var(--syntax-attr-value);
+	font-weight: normal;
+}
+
+.template-placeholder {
+	color: var(--syntax-placeholder);
+	font-weight: bold;
 }
 
 /* 出力エリアのスタイル */
