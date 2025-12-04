@@ -492,7 +492,7 @@ body {
 	overflow: hidden;
 	pointer-events: none;
 	box-sizing: border-box;
-	z-index: 1;
+	z-index: 2;
 }
 
 .code-editor-highlight-content {
@@ -517,7 +517,7 @@ body {
 	height: 100%;
 	padding: 8px;
 	margin: 0;
-	color: transparent;
+	color: #1e1e1e;
 	caret-color: white;
 	background: transparent;
 	font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
@@ -530,8 +530,8 @@ body {
 	resize: none;
 	box-sizing: border-box;
 	overflow: auto;
-	z-index: 2;
-	-webkit-text-fill-color: transparent;
+	z-index: 1;
+	-webkit-text-fill-color: #1e1e1e;
 }
 
 .code-editor-input::-webkit-scrollbar {

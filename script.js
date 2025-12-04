@@ -382,6 +382,22 @@ document.addEventListener("DOMContentLoaded", function () {
 		textarea.addEventListener('input', updateHighlight);
 		textarea.addEventListener('scroll', syncScroll);
 
+		// ペースト時の処理を明示的に追加
+		textarea.addEventListener('paste', (e) => {
+			// ペースト後にハイライトを更新
+			setTimeout(updateHighlight, 0);
+		});
+
+		// カット時の処理
+		textarea.addEventListener('cut', (e) => {
+			setTimeout(updateHighlight, 0);
+		});
+
+		// キーボード入力時の処理（矢印キーなどでスクロールする場合）
+		textarea.addEventListener('keydown', (e) => {
+			setTimeout(syncScroll, 0);
+		});
+
 		// 初期表示
 		updateHighlight();
 		syncScroll();
