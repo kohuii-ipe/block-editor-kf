@@ -16,6 +16,7 @@
  * 10. 変換ロジック
  * 11. イベントハンドラ
  * 12. 初期化
+ * 13. データ共有（エクスポート/インポート）
  *
  * ========================================
  */
@@ -63,11 +64,39 @@ document.addEventListener("DOMContentLoaded", function () {
 
 		// 書式マッピング管理
 		formattingList: document.getElementById("formattingList"),
-		saveFormattingButton: document.getElementById("saveFormattingButton")
+		saveFormattingButton: document.getElementById("saveFormattingButton"),
+
+		// データ共有関連
+		exportDataButton: document.getElementById("exportDataButton"),
+		importDataButton: document.getElementById("importDataButton"),
+		importFileInput: document.getElementById("importFileInput"),
+
+		// エクスポートモーダル
+		exportModal: document.getElementById("exportModal"),
+		exportModalForm: document.getElementById("exportModalForm"),
+		exportPatternSelector: document.getElementById("exportPatternSelector"),
+		exportAllPatternsCheckbox: document.getElementById("exportAllPatternsCheckbox"),
+		exportWithPasswordCheckbox: document.getElementById("exportWithPasswordCheckbox"),
+		exportPasswordSection: document.getElementById("exportPasswordSection"),
+		exportPasswordInput: document.getElementById("exportPasswordInput"),
+		exportPasswordConfirmInput: document.getElementById("exportPasswordConfirmInput"),
+		exportModalCloseSpan: null, // 後で初期化
+
+		// インポートモーダル
+		importModal: document.getElementById("importModal"),
+		importPasswordSection: document.getElementById("importPasswordSection"),
+		importPasswordInput: document.getElementById("importPasswordInput"),
+		importDecryptButton: document.getElementById("importDecryptButton"),
+		importOptionsSection: document.getElementById("importOptionsSection"),
+		importPatternList: document.getElementById("importPatternList"),
+		importExecuteButton: document.getElementById("importExecuteButton"),
+		importModalCloseSpan: null // 後で初期化
 	};
 
 	// closeModalSpanは依存関係があるため後で設定
 	DOM.closeModalSpan = DOM.tagModal ? DOM.tagModal.querySelector(".close") : null;
+	DOM.exportModalCloseSpan = DOM.exportModal ? DOM.exportModal.querySelector(".export-modal-close") : null;
+	DOM.importModalCloseSpan = DOM.importModal ? DOM.importModal.querySelector(".import-modal-close") : null;
 
 	// 後方互換性のため、個別の定数も維持（既存コードとの互換性）
 	const {
@@ -78,7 +107,12 @@ document.addEventListener("DOMContentLoaded", function () {
 		modalTitle, tagModalForm, tagIdInput, tagNameInput, tagTypeSelector,
 		tagTemplateInput, linkItemTemplateSection, linkItemTemplateInput,
 		listItemTemplateSection, listItemTemplateInput,
-		removeLastBrInput, closeModalSpan, formattingList, saveFormattingButton
+		removeLastBrInput, closeModalSpan, formattingList, saveFormattingButton,
+		exportDataButton, importDataButton, importFileInput,
+		exportModal, exportModalForm, exportPatternSelector, exportAllPatternsCheckbox,
+		exportWithPasswordCheckbox, exportPasswordSection, exportPasswordInput, exportPasswordConfirmInput,
+		exportModalCloseSpan, importModal, importPasswordSection, importPasswordInput,
+		importDecryptButton, importOptionsSection, importPatternList, importExecuteButton, importModalCloseSpan
 	} = DOM;
 
 	// ========================================
@@ -102,6 +136,21 @@ document.addEventListener("DOMContentLoaded", function () {
 		DEBOUNCE_DELAY: 500, // ミリ秒
 		MODAL_FOCUS_DELAY: 100, // ミリ秒
 
+		// データ共有関連
+		DATA_SHARING: {
+			FILE_PREFIX: 'block-editor-patterns',
+			FILE_EXTENSION: '.json',
+			VERSION: '1.0',
+			CRYPTO: {
+				ALGORITHM: 'AES-GCM',
+				KEY_LENGTH: 256,
+				IV_LENGTH: 12,
+				SALT_LENGTH: 16,
+				PBKDF2_ITERATIONS: 100000,
+				TAG_LENGTH: 128
+			}
+		},
+
 		// UI文字列
 		MESSAGES: {
 			PATTERN_DELETE_CONFIRM: (name) => `パターン「${name}」を削除してもよろしいですか？`,
@@ -113,6 +162,15 @@ document.addEventListener("DOMContentLoaded", function () {
 			NO_COPY_DATA: 'コピーするHTMLコードがありません。',
 			COPY_SUCCESS: 'コピーしました！',
 			COPY_SUCCESS_FALLBACK: 'コピーしました！(FB)',
+			EXPORT_SUCCESS: (filename) => `エクスポートが完了しました。\nファイル名: ${filename}`,
+			EXPORT_NO_PATTERNS: 'エクスポートするパターンを選択してください。',
+			EXPORT_PASSWORD_MISMATCH: 'パスワードが一致しません。',
+			EXPORT_PASSWORD_TOO_SHORT: 'パスワードは8文字以上を推奨します。',
+			IMPORT_INVALID_FILE: 'ファイル形式が不正です。',
+			IMPORT_DECRYPT_FAILED: 'パスワードが間違っているか、ファイルが破損しています。',
+			IMPORT_SUCCESS_MERGE: (count) => `${count}個のパターンをマージしました。`,
+			IMPORT_SUCCESS_REPLACE: (count) => `すべてのデータを置換し、${count}個のパターンをインポートしました。`,
+			IMPORT_CONFIRM_REPLACE: 'すべての既存データが削除されます。\nこの操作は元に戻せません。\n本当に実行しますか？',
 		},
 
 		// プレースホルダー
@@ -726,6 +784,69 @@ document.addEventListener("DOMContentLoaded", function () {
 		});
 	};
 
+	// 既存の入力エリアのプレースホルダーとラベルを更新する関数
+	const updateExistingInputAreas = () => {
+		const allInputAreas = container.querySelectorAll(".input-text-area");
+
+		allInputAreas.forEach((textarea) => {
+			const tagId = textarea.getAttribute("data-tag-id");
+			const tagInfo = getCustomTagInfo(tagId);
+
+			if (!tagInfo) return;
+
+			const tagName = tagInfo.name;
+			const tagType = tagInfo.tagType;
+
+			// プレースホルダーテキストを更新
+			let placeholderText = `${tagName}タグ用のテキストエリア`;
+
+			if (tagType === "multi") {
+				placeholderText = `【${tagName}】マルチラインモード：各行が個別のタグになります`;
+			} else if (tagType === "p-list") {
+				placeholderText = `【${tagName}】段落+リストモード：通常の行は段落、「-」または「*」で始まる行はリスト項目になります`;
+			} else if (tagType === "link-list") {
+				placeholderText = `【${tagName}】リンクリストモード：各行に[リンクテキスト](URL)の形式で入力してください`;
+			} else if (tagType === "single-link") {
+				placeholderText = `【${tagName}】単一リンクモード：[リンクテキスト](URL)の形式で指定。例：クリック[こちら](https://example.com)してください`;
+			} else if (tagType === "static") {
+				placeholderText = `【${tagName}】静的モード：テンプレートで設定した内容がそのまま出力されます（入力不可）`;
+			} else if (tagType === "code") {
+				placeholderText = `【${tagName}】コードモード：コードを貼り付けてください。HTML特殊文字（<, >, &など）は自動的にエスケープされます`;
+			} else {
+				placeholderText = `${tagName}エリア。テキストを入力してください。`;
+			}
+
+			textarea.setAttribute("data-placeholder", placeholderText);
+
+			// 静的モードの場合は編集不可にする、それ以外は編集可能にする
+			if (tagType === "static") {
+				textarea.setAttribute("contenteditable", "false");
+				textarea.style.backgroundColor = "#f0f0f0";
+				textarea.style.cursor = "not-allowed";
+				textarea.style.opacity = "0.7";
+			} else {
+				textarea.setAttribute("contenteditable", "true");
+				textarea.style.backgroundColor = "white";
+				textarea.style.cursor = "text";
+				textarea.style.opacity = "1";
+			}
+
+			// ラベルのテキストを更新（タグ名が変更された場合）
+			const groupDiv = textarea.closest(".input-area-group");
+			if (groupDiv) {
+				const label = groupDiv.querySelector(".input-label-tag");
+				if (label) {
+					// タグ名のspanを探して更新（number-prefixの次のspan要素）
+					const spans = label.children;
+					if (spans.length >= 2) {
+						// 2番目の要素（タグ名のspan）を更新
+						spans[1].textContent = tagName;
+					}
+				}
+			}
+		});
+	};
+
 	// 書式マッピング保存ボタンのイベントリスナー
 	if (saveFormattingButton) {
 		saveFormattingButton.addEventListener("click", () => {
@@ -1188,6 +1309,7 @@ document.addEventListener("DOMContentLoaded", function () {
 		tagModal.style.display = "none";
 		rebuildTagButtons();
 		rebuildTagButtonList();
+		updateExistingInputAreas(); // 既存の入力エリアを即座に更新
 		saveAllPatterns();
 	});
 
@@ -1299,6 +1421,7 @@ document.addEventListener("DOMContentLoaded", function () {
 					currentPattern.buttons = currentPattern.buttons.filter((b) => b.id !== button.id);
 					rebuildTagButtons();
 					rebuildTagButtonList();
+					updateExistingInputAreas(); // 既存の入力エリアを即座に更新
 					saveAllPatterns();
 				}
 			}, { signal });
@@ -2450,4 +2573,686 @@ document.addEventListener("DOMContentLoaded", function () {
 			}
 		});
 	}
+
+	// ========================================
+	// 13. データ共有（エクスポート/インポート）
+	// ========================================
+
+	// --- 13.1 データフィルタリング関数 ---
+
+	/**
+	 * エクスポート用にパターンデータをフィルタリングする
+	 * inputAreasを除外し、選択されたパターンのみを抽出
+	 * @param {Array<string>} patternIds - エクスポートするパターンIDの配列
+	 * @returns {Object} フィルタリングされたパターンオブジェクト
+	 */
+	const filterPatternsForExport = (patternIds) => {
+		const filtered = {};
+
+		patternIds.forEach(id => {
+			if (patterns[id]) {
+				filtered[id] = {
+					name: patterns[id].name,
+					buttons: patterns[id].buttons,
+					formattingMap: patterns[id].formattingMap
+					// inputAreasは意図的に除外
+				};
+			}
+		});
+
+		return filtered;
+	};
+
+	/**
+	 * インポートデータの検証
+	 * @param {Object} data - インポートするデータ
+	 * @returns {Object} { valid: boolean, error: string, patternCount: number }
+	 */
+	const validateImportData = (data) => {
+		// バージョンチェック
+		if (!data.version || typeof data.version !== 'string') {
+			return { valid: false, error: 'バージョン情報が不正です。', patternCount: 0 };
+		}
+
+		// パターンの存在チェック
+		if (!data.patterns || typeof data.patterns !== 'object') {
+			return { valid: false, error: 'パターンデータが見つかりません。', patternCount: 0 };
+		}
+
+		const patternIds = Object.keys(data.patterns);
+		if (patternIds.length === 0) {
+			return { valid: false, error: 'エクスポートされたパターンがありません。', patternCount: 0 };
+		}
+
+		// 各パターンの構造を検証
+		for (const id of patternIds) {
+			const pattern = data.patterns[id];
+
+			// 必須フィールドのチェック
+			if (!pattern.name || typeof pattern.name !== 'string') {
+				return { valid: false, error: `パターン ${id} の名前が不正です。`, patternCount: 0 };
+			}
+
+			if (!Array.isArray(pattern.buttons)) {
+				return { valid: false, error: `パターン ${id} のボタン情報が不正です。`, patternCount: 0 };
+			}
+
+			// ボタンの検証
+			for (const button of pattern.buttons) {
+				if (!button.id || !button.name || !button.tagType || button.template === undefined) {
+					return { valid: false, error: `パターン ${id} のボタン構造が不正です。`, patternCount: 0 };
+				}
+
+				// テンプレートの検証（既存のvalidateTemplate関数を再利用）
+				const validation = validateTemplate(button.template, button.tagType);
+				if (!validation.valid) {
+					return {
+						valid: false,
+						error: `パターン ${id} のボタン「${button.name}」: ${validation.error}`,
+						patternCount: 0
+					};
+				}
+			}
+
+			// formattingMapの検証
+			if (pattern.formattingMap && typeof pattern.formattingMap !== 'object') {
+				return { valid: false, error: `パターン ${id} の書式マッピングが不正です。`, patternCount: 0 };
+			}
+		}
+
+		return { valid: true, error: '', patternCount: patternIds.length };
+	};
+
+	// --- 13.2 暗号化関数 ---
+
+	/**
+	 * パスワードから暗号化キーを生成
+	 * @param {string} password - パスワード
+	 * @param {Uint8Array} salt - ソルト
+	 * @returns {Promise<CryptoKey>} 暗号化キー
+	 */
+	const deriveKeyFromPassword = async (password, salt) => {
+		const encoder = new TextEncoder();
+		const passwordBuffer = encoder.encode(password);
+
+		// パスワードからキーマテリアルを作成
+		const keyMaterial = await window.crypto.subtle.importKey(
+			'raw',
+			passwordBuffer,
+			'PBKDF2',
+			false,
+			['deriveBits', 'deriveKey']
+		);
+
+		// PBKDF2でキーを派生
+		return window.crypto.subtle.deriveKey(
+			{
+				name: 'PBKDF2',
+				salt: salt,
+				iterations: CONSTANTS.DATA_SHARING.CRYPTO.PBKDF2_ITERATIONS,
+				hash: 'SHA-256'
+			},
+			keyMaterial,
+			{
+				name: CONSTANTS.DATA_SHARING.CRYPTO.ALGORITHM,
+				length: CONSTANTS.DATA_SHARING.CRYPTO.KEY_LENGTH
+			},
+			false,
+			['encrypt', 'decrypt']
+		);
+	};
+
+	/**
+	 * データを暗号化
+	 * @param {Object} data - 暗号化するデータ
+	 * @param {string} password - パスワード
+	 * @returns {Promise<Object>} 暗号化されたデータパッケージ
+	 */
+	const encryptData = async (data, password) => {
+		try {
+			// ソルトとIVを生成
+			const salt = window.crypto.getRandomValues(
+				new Uint8Array(CONSTANTS.DATA_SHARING.CRYPTO.SALT_LENGTH)
+			);
+			const iv = window.crypto.getRandomValues(
+				new Uint8Array(CONSTANTS.DATA_SHARING.CRYPTO.IV_LENGTH)
+			);
+
+			// キーを派生
+			const key = await deriveKeyFromPassword(password, salt);
+
+			// データをJSON文字列に変換
+			const encoder = new TextEncoder();
+			const dataBuffer = encoder.encode(JSON.stringify(data));
+
+			// 暗号化
+			const encryptedBuffer = await window.crypto.subtle.encrypt(
+				{
+					name: CONSTANTS.DATA_SHARING.CRYPTO.ALGORITHM,
+					iv: iv,
+					tagLength: CONSTANTS.DATA_SHARING.CRYPTO.TAG_LENGTH
+				},
+				key,
+				dataBuffer
+			);
+
+			// Base64エンコード
+			const encryptedArray = new Uint8Array(encryptedBuffer);
+			const encryptedBase64 = btoa(String.fromCharCode(...encryptedArray));
+			const saltBase64 = btoa(String.fromCharCode(...salt));
+			const ivBase64 = btoa(String.fromCharCode(...iv));
+
+			return {
+				encrypted: true,
+				version: CONSTANTS.DATA_SHARING.VERSION,
+				salt: saltBase64,
+				iv: ivBase64,
+				data: encryptedBase64
+			};
+		} catch (error) {
+			console.error('暗号化エラー:', error);
+			throw new Error('データの暗号化に失敗しました。');
+		}
+	};
+
+	/**
+	 * データを復号化
+	 * @param {Object} encryptedPackage - 暗号化されたデータパッケージ
+	 * @param {string} password - パスワード
+	 * @returns {Promise<Object>} 復号化されたデータ
+	 */
+	const decryptData = async (encryptedPackage, password) => {
+		try {
+			// Base64デコード
+			const saltBase64 = encryptedPackage.salt;
+			const ivBase64 = encryptedPackage.iv;
+			const encryptedBase64 = encryptedPackage.data;
+
+			const salt = new Uint8Array(
+				atob(saltBase64).split('').map(c => c.charCodeAt(0))
+			);
+			const iv = new Uint8Array(
+				atob(ivBase64).split('').map(c => c.charCodeAt(0))
+			);
+			const encryptedArray = new Uint8Array(
+				atob(encryptedBase64).split('').map(c => c.charCodeAt(0))
+			);
+
+			// キーを派生
+			const key = await deriveKeyFromPassword(password, salt);
+
+			// 復号化
+			const decryptedBuffer = await window.crypto.subtle.decrypt(
+				{
+					name: CONSTANTS.DATA_SHARING.CRYPTO.ALGORITHM,
+					iv: iv,
+					tagLength: CONSTANTS.DATA_SHARING.CRYPTO.TAG_LENGTH
+				},
+				key,
+				encryptedArray
+			);
+
+			// JSON文字列にデコード
+			const decoder = new TextDecoder();
+			const jsonString = decoder.decode(decryptedBuffer);
+
+			return JSON.parse(jsonString);
+		} catch (error) {
+			console.error('復号化エラー:', error);
+			throw new Error(CONSTANTS.MESSAGES.IMPORT_DECRYPT_FAILED);
+		}
+	};
+
+	// --- 13.3 エクスポート関数 ---
+
+	/**
+	 * パターン選択UIを構築
+	 */
+	const buildExportPatternSelector = () => {
+		const container = exportPatternSelector;
+		container.innerHTML = '';
+
+		const fragment = document.createDocumentFragment();
+
+		Object.keys(patterns).forEach(id => {
+			const pattern = patterns[id];
+			const label = document.createElement('label');
+
+			const checkbox = document.createElement('input');
+			checkbox.type = 'checkbox';
+			checkbox.value = id;
+			checkbox.className = 'export-pattern-checkbox';
+			checkbox.checked = true; // デフォルトで全選択
+
+			const span = document.createElement('span');
+			span.textContent = `${pattern.name} (${pattern.buttons.length}個のタグボタン)`;
+
+			label.appendChild(checkbox);
+			label.appendChild(span);
+			fragment.appendChild(label);
+		});
+
+		container.appendChild(fragment);
+	};
+
+	/**
+	 * エクスポート処理のメイン関数
+	 * @param {Array<string>} patternIds - エクスポートするパターンID
+	 * @param {string|null} password - パスワード（nullの場合は暗号化なし）
+	 */
+	const executeExport = async (patternIds, password) => {
+		try {
+			// データをフィルタリング
+			const filteredPatterns = filterPatternsForExport(patternIds);
+
+			// エクスポートデータパッケージを作成
+			let exportPackage = {
+				version: CONSTANTS.DATA_SHARING.VERSION,
+				exportedAt: new Date().toISOString(),
+				patterns: filteredPatterns
+			};
+
+			// パスワードが指定されている場合は暗号化
+			if (password) {
+				exportPackage = await encryptData(exportPackage, password);
+			} else {
+				exportPackage.encrypted = false;
+			}
+
+			// ファイル名を生成
+			const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+			const encrypted = password ? '-encrypted' : '';
+			const filename = `${CONSTANTS.DATA_SHARING.FILE_PREFIX}-${timestamp}${encrypted}${CONSTANTS.DATA_SHARING.FILE_EXTENSION}`;
+
+			// Blobを作成してダウンロード
+			const jsonString = JSON.stringify(exportPackage, null, 2);
+			const blob = new Blob([jsonString], { type: 'application/json' });
+			const url = URL.createObjectURL(blob);
+
+			const a = document.createElement('a');
+			a.href = url;
+			a.download = filename;
+			document.body.appendChild(a);
+			a.click();
+			document.body.removeChild(a);
+			URL.revokeObjectURL(url);
+
+			alert(CONSTANTS.MESSAGES.EXPORT_SUCCESS(filename));
+
+			// モーダルを閉じる
+			exportModal.style.display = 'none';
+			exportModal.setAttribute('aria-hidden', 'true');
+		} catch (error) {
+			console.error('エクスポートエラー:', error);
+			alert('エクスポートに失敗しました。\nエラー: ' + error.message);
+		}
+	};
+
+	// --- 13.4 インポート関数 ---
+
+	/**
+	 * ファイルを読み込む
+	 * @param {File} file - 読み込むファイル
+	 * @returns {Promise<Object>} パースされたJSONオブジェクト
+	 */
+	const readImportFile = (file) => {
+		return new Promise((resolve, reject) => {
+			const reader = new FileReader();
+
+			reader.onload = (e) => {
+				try {
+					const jsonData = JSON.parse(e.target.result);
+					resolve(jsonData);
+				} catch (error) {
+					reject(new Error(CONSTANTS.MESSAGES.IMPORT_INVALID_FILE));
+				}
+			};
+
+			reader.onerror = () => {
+				reject(new Error('ファイルの読み込みに失敗しました。'));
+			};
+
+			reader.readAsText(file);
+		});
+	};
+
+	/**
+	 * インポートされたパターンリストを表示
+	 * @param {Object} data - インポートデータ
+	 */
+	const displayImportPatternList = (data) => {
+		const container = importPatternList;
+		container.innerHTML = '';
+
+		const fragment = document.createDocumentFragment();
+
+		Object.keys(data.patterns).forEach(id => {
+			const pattern = data.patterns[id];
+			const div = document.createElement('div');
+			div.className = 'pattern-import-item';
+			div.innerHTML = `
+				<strong>${pattern.name}</strong><br>
+				<span style="color: #666; font-size: 0.9em;">
+					${pattern.buttons.length}個のタグボタン,
+					${Object.keys(pattern.formattingMap || {}).length}個の書式マッピング
+				</span>
+			`;
+			fragment.appendChild(div);
+		});
+
+		container.appendChild(fragment);
+	};
+
+	/**
+	 * インポート実行（マージまたは置換）
+	 * @param {Object} data - インポートするデータ
+	 * @param {string} mode - 'merge' または 'replace'
+	 */
+	const executeImport = (data, mode) => {
+		try {
+			const importedPatterns = data.patterns;
+			const patternCount = Object.keys(importedPatterns).length;
+
+			if (mode === 'replace') {
+				// 確認ダイアログ
+				if (!confirm(CONSTANTS.MESSAGES.IMPORT_CONFIRM_REPLACE)) {
+					return;
+				}
+
+				// すべてのパターンを置換
+				patterns = {};
+				Object.keys(importedPatterns).forEach(id => {
+					patterns[id] = {
+						...importedPatterns[id],
+						inputAreas: [] // 空の入力エリアを追加
+					};
+				});
+
+				// IDカウンタをリセット
+				maxPatternId = 0;
+				maxTagId = 0;
+				Object.keys(patterns).forEach(id => {
+					const num = parseInt(id.replace("pattern", ""));
+					if (!isNaN(num)) {
+						maxPatternId = Math.max(maxPatternId, num);
+					}
+					patterns[id].buttons.forEach(button => {
+						if (button.id.startsWith("custom")) {
+							const tagNum = parseInt(button.id.replace("custom", ""));
+							if (!isNaN(tagNum)) {
+								maxTagId = Math.max(maxTagId, tagNum);
+							}
+						}
+					});
+				});
+
+				alert(CONSTANTS.MESSAGES.IMPORT_SUCCESS_REPLACE(patternCount));
+			} else {
+				// マージモード
+				Object.keys(importedPatterns).forEach(id => {
+					// 同名パターンが存在する場合は上書き、存在しない場合は新規追加
+					patterns[id] = {
+						...importedPatterns[id],
+						inputAreas: patterns[id]?.inputAreas || [] // 既存の入力エリアを保持（あれば）
+					};
+
+					// IDカウンタを更新
+					const num = parseInt(id.replace("pattern", ""));
+					if (!isNaN(num)) {
+						maxPatternId = Math.max(maxPatternId, num);
+					}
+					patterns[id].buttons.forEach(button => {
+						if (button.id.startsWith("custom")) {
+							const tagNum = parseInt(button.id.replace("custom", ""));
+							if (!isNaN(tagNum)) {
+								maxTagId = Math.max(maxTagId, tagNum);
+							}
+						}
+					});
+				});
+
+				alert(CONSTANTS.MESSAGES.IMPORT_SUCCESS_MERGE(patternCount));
+			}
+
+			// データを保存
+			saveAllPatterns();
+
+			// UIを再構築
+			const selectedId = getSelectedPatternId();
+			rebuildPatternUI(selectedId);
+			rebuildTagButtons();
+			loadFormattingMap();
+			buildFormattingUI();
+			updateInsertionPoints();
+
+			// モーダルを閉じる
+			importModal.style.display = 'none';
+			importModal.setAttribute('aria-hidden', 'true');
+		} catch (error) {
+			console.error('インポートエラー:', error);
+			alert('インポートに失敗しました。\nエラー: ' + error.message);
+		}
+	};
+
+	// --- 13.5 イベントハンドラ ---
+
+	// エクスポートボタンのクリックハンドラ
+	exportDataButton.addEventListener('click', () => {
+		buildExportPatternSelector();
+		exportModal.style.display = 'block';
+		exportModal.setAttribute('aria-hidden', 'false');
+
+		// フォーカスを設定
+		setTimeout(() => {
+			exportAllPatternsCheckbox.focus();
+		}, CONSTANTS.MODAL_FOCUS_DELAY);
+	});
+
+	// 「すべてのパターンをエクスポート」チェックボックスの変更ハンドラ
+	exportAllPatternsCheckbox.addEventListener('change', (e) => {
+		const checkboxes = exportPatternSelector.querySelectorAll('.export-pattern-checkbox');
+		checkboxes.forEach(cb => {
+			cb.checked = e.target.checked;
+		});
+	});
+
+	// 「パスワードで保護する」チェックボックスの変更ハンドラ
+	exportWithPasswordCheckbox.addEventListener('change', (e) => {
+		exportPasswordSection.style.display = e.target.checked ? 'block' : 'none';
+		if (e.target.checked) {
+			setTimeout(() => {
+				exportPasswordInput.focus();
+			}, 100);
+		}
+	});
+
+	// エクスポートフォームの送信ハンドラ
+	exportModalForm.addEventListener('submit', async (e) => {
+		e.preventDefault();
+
+		// 選択されたパターンを取得
+		const checkboxes = exportPatternSelector.querySelectorAll('.export-pattern-checkbox:checked');
+		const selectedIds = Array.from(checkboxes).map(cb => cb.value);
+
+		if (selectedIds.length === 0) {
+			alert(CONSTANTS.MESSAGES.EXPORT_NO_PATTERNS);
+			return;
+		}
+
+		// パスワードチェック
+		let password = null;
+		if (exportWithPasswordCheckbox.checked) {
+			const pwd1 = exportPasswordInput.value;
+			const pwd2 = exportPasswordConfirmInput.value;
+
+			if (!pwd1) {
+				alert('パスワードを入力してください。');
+				return;
+			}
+
+			if (pwd1 !== pwd2) {
+				alert(CONSTANTS.MESSAGES.EXPORT_PASSWORD_MISMATCH);
+				return;
+			}
+
+			if (pwd1.length < 8) {
+				if (!confirm(CONSTANTS.MESSAGES.EXPORT_PASSWORD_TOO_SHORT + '\n続行しますか？')) {
+					return;
+				}
+			}
+
+			password = pwd1;
+		}
+
+		// エクスポート実行
+		await executeExport(selectedIds, password);
+
+		// フォームをリセット
+		exportModalForm.reset();
+		exportPasswordSection.style.display = 'none';
+	});
+
+	// インポートボタンのクリックハンドラ
+	importDataButton.addEventListener('click', () => {
+		importFileInput.click();
+	});
+
+	// ファイル選択ハンドラ
+	importFileInput.addEventListener('change', async (e) => {
+		const file = e.target.files[0];
+		if (!file) return;
+
+		try {
+			// ファイルを読み込む
+			const data = await readImportFile(file);
+
+			// 暗号化されているかチェック
+			if (data.encrypted === true) {
+				// パスワード入力セクションを表示
+				importPasswordSection.style.display = 'block';
+				importOptionsSection.style.display = 'none';
+				importModal.style.display = 'block';
+				importModal.setAttribute('aria-hidden', 'false');
+
+				// データを一時保存
+				importModal._encryptedData = data;
+
+				setTimeout(() => {
+					importPasswordInput.focus();
+				}, CONSTANTS.MODAL_FOCUS_DELAY);
+			} else {
+				// 暗号化されていない場合は直接検証
+				const validation = validateImportData(data);
+				if (!validation.valid) {
+					alert(CONSTANTS.MESSAGES.IMPORT_INVALID_FILE + '\n' + validation.error);
+					return;
+				}
+
+				// インポートオプションを表示
+				displayImportPatternList(data);
+				importPasswordSection.style.display = 'none';
+				importOptionsSection.style.display = 'block';
+				importModal.style.display = 'block';
+				importModal.setAttribute('aria-hidden', 'false');
+
+				// データを一時保存
+				importModal._decryptedData = data;
+			}
+		} catch (error) {
+			console.error('ファイル読み込みエラー:', error);
+			alert('ファイルの読み込みに失敗しました。\nエラー: ' + error.message);
+		} finally {
+			// ファイル入力をリセット（同じファイルを再選択可能にする）
+			importFileInput.value = '';
+		}
+	});
+
+	// 復号化ボタンのクリックハンドラ
+	importDecryptButton.addEventListener('click', async () => {
+		const password = importPasswordInput.value;
+		if (!password) {
+			alert('パスワードを入力してください。');
+			return;
+		}
+
+		try {
+			const encryptedData = importModal._encryptedData;
+			const decryptedData = await decryptData(encryptedData, password);
+
+			// 検証
+			const validation = validateImportData(decryptedData);
+			if (!validation.valid) {
+				alert(CONSTANTS.MESSAGES.IMPORT_INVALID_FILE + '\n' + validation.error);
+				return;
+			}
+
+			// インポートオプションを表示
+			displayImportPatternList(decryptedData);
+			importPasswordSection.style.display = 'none';
+			importOptionsSection.style.display = 'block';
+
+			// データを一時保存
+			importModal._decryptedData = decryptedData;
+
+			// パスワード入力をクリア
+			importPasswordInput.value = '';
+		} catch (error) {
+			console.error('復号化エラー:', error);
+			alert(error.message);
+		}
+	});
+
+	// インポート実行ボタンのクリックハンドラ
+	importExecuteButton.addEventListener('click', () => {
+		const data = importModal._decryptedData;
+		if (!data) {
+			alert('データが読み込まれていません。');
+			return;
+		}
+
+		const mode = document.querySelector('input[name="importMode"]:checked').value;
+		executeImport(data, mode);
+
+		// 一時データをクリア
+		delete importModal._encryptedData;
+		delete importModal._decryptedData;
+	});
+
+	// モーダルを閉じる処理
+	exportModalCloseSpan.onclick = () => {
+		exportModal.style.display = 'none';
+		exportModal.setAttribute('aria-hidden', 'true');
+		exportModalForm.reset();
+		exportPasswordSection.style.display = 'none';
+	};
+
+	importModalCloseSpan.onclick = () => {
+		importModal.style.display = 'none';
+		importModal.setAttribute('aria-hidden', 'true');
+		importPasswordInput.value = '';
+		importPasswordSection.style.display = 'none';
+		importOptionsSection.style.display = 'none';
+		delete importModal._encryptedData;
+		delete importModal._decryptedData;
+	};
+
+	// キーボードでモーダルを閉じる
+	[exportModalCloseSpan, importModalCloseSpan].forEach(span => {
+		span.addEventListener('keydown', (e) => {
+			if (e.key === 'Enter' || e.key === ' ') {
+				e.preventDefault();
+				span.click();
+			}
+		});
+	});
+
+	// モーダル外をクリックしたら閉じる
+	window.addEventListener('click', (e) => {
+		if (e.target === exportModal) {
+			exportModalCloseSpan.click();
+		} else if (e.target === importModal) {
+			importModalCloseSpan.click();
+		}
+	});
+
 });

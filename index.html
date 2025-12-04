@@ -47,12 +47,29 @@
 		<div id="formattingManagement">
 			<p style="font-size: 0.9em; margin-bottom: 10px">
 				※Wordからコピー＆ペーストした際の書式変換ルールをカスタマイズします。<br>
-				※[TEXT]を含むテンプレート形式で入力してください（例: &lt;strong&gt;[TEXT]&lt;/strong&gt;）
+				※[TEXT]を含むテンプレート形式で入力してください（例: &lt;strong&gt;[TEXT]&lt;/strong&gt;）<br>
+				※保存後、次回のペースト操作から新しいルールが適用されます
 			</p>
 			<div id="formattingList">
 				<!-- 書式マッピング設定がJSでここに表示されます -->
 			</div>
 			<button id="saveFormattingButton" style="margin-top: 10px;">💾 書式マッピングを保存</button>
+		</div>
+
+		<hr />
+
+		<!-- データ共有管理エリア -->
+		<h2>データ共有</h2>
+		<div id="dataSharingManagement">
+			<p style="font-size: 0.9em; margin-bottom: 10px">
+				※パターンと書式マッピングを他の人と共有できます（入力エリアの内容は含まれません）<br>
+				※パスワードを設定すると、ファイルが暗号化されます
+			</p>
+			<div style="display: flex; gap: 10px; margin-bottom: 10px;">
+				<button id="exportDataButton">📤 データをエクスポート</button>
+				<button id="importDataButton">📥 データをインポート</button>
+			</div>
+			<input type="file" id="importFileInput" accept=".json" style="display: none;">
 		</div>
 
 		<hr />
@@ -151,6 +168,81 @@
 
 					<button type="submit">保存</button>
 				</form>
+			</div>
+		</div>
+
+		<!-- エクスポートモーダル -->
+		<div id="exportModal" class="modal" role="dialog" aria-labelledby="exportModalTitle" aria-modal="true" aria-hidden="true">
+			<div class="modal-content">
+				<span class="close export-modal-close" role="button" tabindex="0" aria-label="モーダルを閉じる">&times;</span>
+				<h3 id="exportModalTitle">データのエクスポート</h3>
+				<form id="exportModalForm">
+					<label for="exportPatternSelector">エクスポートするパターンを選択:</label>
+					<div id="exportPatternSelector" style="max-height: 200px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; margin-bottom: 15px;">
+						<!-- チェックボックスがJSで動的に生成されます -->
+					</div>
+
+					<label style="display: flex; align-items: center; margin-bottom: 15px;">
+						<input type="checkbox" id="exportAllPatternsCheckbox" style="width: auto; margin-right: 8px;">
+						<span>すべてのパターンをエクスポート</span>
+					</label>
+
+					<hr style="margin: 20px 0;">
+
+					<label style="display: flex; align-items: center; margin-bottom: 10px;">
+						<input type="checkbox" id="exportWithPasswordCheckbox" style="width: auto; margin-right: 8px;">
+						<span>パスワードで保護する（推奨）</span>
+					</label>
+
+					<div id="exportPasswordSection" style="display: none; margin-left: 24px;">
+						<label for="exportPasswordInput">パスワード:</label>
+						<input type="password" id="exportPasswordInput" placeholder="8文字以上を推奨" />
+
+						<label for="exportPasswordConfirmInput">パスワード（確認）:</label>
+						<input type="password" id="exportPasswordConfirmInput" placeholder="同じパスワードを再入力" />
+					</div>
+
+					<button type="submit" style="margin-top: 15px;">💾 エクスポート</button>
+				</form>
+			</div>
+		</div>
+
+		<!-- インポートモーダル -->
+		<div id="importModal" class="modal" role="dialog" aria-labelledby="importModalTitle" aria-modal="true" aria-hidden="true">
+			<div class="modal-content">
+				<span class="close import-modal-close" role="button" tabindex="0" aria-label="モーダルを閉じる">&times;</span>
+				<h3 id="importModalTitle">データのインポート</h3>
+				<div id="importModalContent">
+					<!-- ステップ1: パスワード入力（暗号化されている場合のみ） -->
+					<div id="importPasswordSection" style="display: none;">
+						<p>このファイルはパスワードで保護されています。</p>
+						<label for="importPasswordInput">パスワード:</label>
+						<input type="password" id="importPasswordInput" placeholder="パスワードを入力" />
+						<button id="importDecryptButton" style="margin-top: 10px;">🔓 復号化して続ける</button>
+					</div>
+
+					<!-- ステップ2: インポートオプション選択 -->
+					<div id="importOptionsSection" style="display: none;">
+						<p style="margin-bottom: 15px;">
+							<strong>インポートするパターン:</strong>
+						</p>
+						<div id="importPatternList" style="max-height: 200px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; margin-bottom: 15px; background-color: #f9f9f9;">
+							<!-- パターンリストがJSで表示されます -->
+						</div>
+
+						<label style="font-weight: bold; margin-top: 15px; display: block;">インポート方法:</label>
+						<label style="display: flex; align-items: center; margin: 10px 0;">
+							<input type="radio" name="importMode" value="merge" checked style="width: auto; margin-right: 8px;">
+							<span>マージ（既存のデータと統合、同名パターンは上書き）</span>
+						</label>
+						<label style="display: flex; align-items: center; margin: 10px 0;">
+							<input type="radio" name="importMode" value="replace" style="width: auto; margin-right: 8px;">
+							<span style="color: red;">置換（すべての既存データを削除して上書き）</span>
+						</label>
+
+						<button id="importExecuteButton" style="margin-top: 15px;">✅ インポート実行</button>
+					</div>
+				</div>
 			</div>
 		</div>
 

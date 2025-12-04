@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(echo \"Open your browser DevTools (F12) and run this in the Console:\n\nconsole.log(JSON.parse(localStorage.getItem(''customTagPatternsV2'')));\n\nLook at the ''inputAreas'' array to see what HTML is being saved.\")",
+      "mcp__ide__getDiagnostics",
+      "Bash(start index.html)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

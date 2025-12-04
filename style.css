@@ -494,3 +494,57 @@ body {
 #outputContainer code[contenteditable="true"]:focus {
 	background-color: #ffffff;
 }
+
+/* ========================================
+   Data Sharing Management
+   ======================================== */
+
+/* データ共有管理エリア */
+#dataSharingManagement {
+	border: 1px solid var(--color-border);
+	padding: var(--spacing-sm);
+	margin-bottom: var(--spacing-md);
+	background-color: var(--color-bg-light);
+}
+
+#dataSharingManagement button {
+	padding: 8px 16px;
+	font-size: var(--font-size-md);
+	min-height: 36px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	cursor: pointer;
+}
+
+/* エクスポート/インポートモーダルのスタイル */
+#exportPatternSelector label,
+#importPatternList label {
+	display: block;
+	padding: 5px;
+	margin: 2px 0;
+	cursor: pointer;
+	transition: background-color 0.2s;
+}
+
+#exportPatternSelector label:hover,
+#importPatternList label:hover {
+	background-color: var(--color-bg-hover);
+}
+
+#exportPatternSelector input[type="checkbox"],
+#importPatternList input[type="checkbox"] {
+	margin-right: 8px;
+	width: auto;
+}
+
+.pattern-import-item {
+	padding: 8px;
+	border-bottom: 1px solid var(--color-border-lighter);
+	font-family: monospace;
+	font-size: 0.9em;
+}
+
+.pattern-import-item:last-child {
+	border-bottom: none;
+}
