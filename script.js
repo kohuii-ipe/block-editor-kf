@@ -2606,22 +2606,39 @@ document.addEventListener("DOMContentLoaded", function () {
 	/**
 	 * インポートデータの検証
 	 * @param {Object} data - インポートするデータ
-	 * @returns {Object} { valid: boolean, error: string, patternCount: number }
+	 * @returns {Object} { valid: boolean, error: string, warnings: string[], patternCount: number }
 	 */
 	const validateImportData = (data) => {
+		const warnings = [];
+
 		// バージョンチェック
 		if (!data.version || typeof data.version !== 'string') {
-			return { valid: false, error: 'バージョン情報が不正です。', patternCount: 0 };
+			return {
+				valid: false,
+				error: 'ファイル形式が不正です。\n\n原因: バージョン情報が見つかりません。\n\n対処法: 正しいエクスポートファイルを選択してください。',
+				warnings: [],
+				patternCount: 0
+			};
 		}
 
 		// パターンの存在チェック
 		if (!data.patterns || typeof data.patterns !== 'object') {
-			return { valid: false, error: 'パターンデータが見つかりません。', patternCount: 0 };
+			return {
+				valid: false,
+				error: 'ファイル形式が不正です。\n\n原因: パターンデータが見つかりません。\n\n対処法: 正しいエクスポートファイルを選択してください。',
+				warnings: [],
+				patternCount: 0
+			};
 		}
 
 		const patternIds = Object.keys(data.patterns);
 		if (patternIds.length === 0) {
-			return { valid: false, error: 'エクスポートされたパターンがありません。', patternCount: 0 };
+			return {
+				valid: false,
+				error: 'エクスポートされたパターンがありません。\n\n対処法: パターンが含まれているファイルを選択してください。',
+				warnings: [],
+				patternCount: 0
+			};
 		}
 
 		// 各パターンの構造を検証
@@ -2630,37 +2647,66 @@ document.addEventListener("DOMContentLoaded", function () {
 
 			// 必須フィールドのチェック
 			if (!pattern.name || typeof pattern.name !== 'string') {
-				return { valid: false, error: `パターン ${id} の名前が不正です。`, patternCount: 0 };
+				return {
+					valid: false,
+					error: `パターン「${id}」のデータが不正です。\n\n原因: パターン名が設定されていません。\n\n対処法: エクスポート元でパターン名を設定してください。`,
+					warnings: [],
+					patternCount: 0
+				};
 			}
 
 			if (!Array.isArray(pattern.buttons)) {
-				return { valid: false, error: `パターン ${id} のボタン情報が不正です。`, patternCount: 0 };
+				return {
+					valid: false,
+					error: `パターン「${pattern.name}」のデータが不正です。\n\n原因: タグボタン情報が見つかりません。\n\n対処法: エクスポート元でタグボタンを設定してください。`,
+					warnings: [],
+					patternCount: 0
+				};
 			}
 
 			// ボタンの検証
 			for (const button of pattern.buttons) {
 				if (!button.id || !button.name || !button.tagType || button.template === undefined) {
-					return { valid: false, error: `パターン ${id} のボタン構造が不正です。`, patternCount: 0 };
+					return {
+						valid: false,
+						error: `パターン「${pattern.name}」のタグボタンが不正です。\n\n原因: 必須項目（ID、名前、タイプ、テンプレート）が不足しています。\n\n対処法: エクスポート元でボタン設定を確認してください。`,
+						warnings: [],
+						patternCount: 0
+					};
 				}
 
 				// テンプレートの検証（既存のvalidateTemplate関数を再利用）
+				// ★ 変更点: テンプレート検証の失敗を警告として扱い、インポートは続行可能にする
 				const validation = validateTemplate(button.template, button.tagType);
 				if (!validation.valid) {
-					return {
-						valid: false,
-						error: `パターン ${id} のボタン「${button.name}」: ${validation.error}`,
-						patternCount: 0
-					};
+					// セキュリティ上危険なパターンの場合のみエラーとして拒否
+					const isDangerous = validation.error.includes('危険な要素');
+					if (isDangerous) {
+						return {
+							valid: false,
+							error: `パターン「${pattern.name}」のボタン「${button.name}」にセキュリティ上の問題があります。\n\n詳細: ${validation.error}\n\n対処法: エクスポート元で危険なコード（scriptタグなど）を削除してください。`,
+							warnings: [],
+							patternCount: 0
+						};
+					}
+
+					// プレースホルダーの問題などは警告として記録（インポートは続行）
+					warnings.push(`⚠️ パターン「${pattern.name}」→ ボタン「${button.name}」: ${validation.error}`);
 				}
 			}
 
 			// formattingMapの検証
 			if (pattern.formattingMap && typeof pattern.formattingMap !== 'object') {
-				return { valid: false, error: `パターン ${id} の書式マッピングが不正です。`, patternCount: 0 };
+				warnings.push(`⚠️ パターン「${pattern.name}」の書式マッピング設定が不正です（スキップされます）`);
 			}
 		}
 
-		return { valid: true, error: '', patternCount: patternIds.length };
+		return {
+			valid: true,
+			error: '',
+			warnings: warnings,
+			patternCount: patternIds.length
+		};
 	};
 
 	// --- 13.2 暗号化関数 ---
@@ -2917,28 +2963,93 @@ document.addEventListener("DOMContentLoaded", function () {
 	};
 
 	/**
-	 * インポートされたパターンリストを表示
+	 * インポートされたパターンリストを表示（プレビュー付き）
 	 * @param {Object} data - インポートデータ
+	 * @param {Object} validation - 検証結果（オプション）
 	 */
-	const displayImportPatternList = (data) => {
+	const displayImportPatternList = (data, validation) => {
 		const container = importPatternList;
 		container.innerHTML = '';
 
 		const fragment = document.createDocumentFragment();
 
+		// サマリー情報を追加
+		let newCount = 0;
+		let overwriteCount = 0;
+
+		Object.keys(data.patterns).forEach(id => {
+			if (patterns[id]) {
+				overwriteCount++;
+			} else {
+				newCount++;
+			}
+		});
+
+		// サマリーヘッダーを作成
+		const summaryDiv = document.createElement('div');
+		summaryDiv.style.cssText = 'background-color: #e3f2fd; padding: 10px; margin-bottom: 10px; border-radius: 4px; font-size: 0.9em;';
+		summaryDiv.innerHTML = `
+			<strong>📊 インポート内容:</strong><br>
+			<span style="color: #2e7d32;">✨ 新規追加: ${newCount}個</span> /
+			<span style="color: #ed6c02;">🔄 上書き: ${overwriteCount}個</span> /
+			<span>合計: ${newCount + overwriteCount}個</span>
+		`;
+		fragment.appendChild(summaryDiv);
+
+		// 各パターンの詳細を表示
 		Object.keys(data.patterns).forEach(id => {
 			const pattern = data.patterns[id];
+			const isExisting = patterns[id] !== undefined;
+			const statusIcon = isExisting ? '🔄' : '✨';
+			const statusText = isExisting ? '上書き' : '新規';
+			const statusColor = isExisting ? '#ed6c02' : '#2e7d32';
+
 			const div = document.createElement('div');
 			div.className = 'pattern-import-item';
+			div.style.cssText = `border-left: 3px solid ${statusColor}; padding-left: 8px;`;
+
+			// パターン名の横にステータスバッジを表示
+			const badge = `<span style="background-color: ${statusColor}; color: white; padding: 2px 6px; border-radius: 3px; font-size: 0.75em; margin-left: 8px;">${statusIcon} ${statusText}</span>`;
+
 			div.innerHTML = `
-				<strong>${pattern.name}</strong><br>
-				<span style="color: #666; font-size: 0.9em;">
+				<strong>${pattern.name}</strong>${badge}<br>
+				<span style="color: #666; font-size: 0.85em;">
 					${pattern.buttons.length}個のタグボタン,
 					${Object.keys(pattern.formattingMap || {}).length}個の書式マッピング
 				</span>
 			`;
+
+			// 上書きの場合、既存データとの比較情報を表示
+			if (isExisting) {
+				const existingPattern = patterns[id];
+				const buttonDiff = pattern.buttons.length - existingPattern.buttons.length;
+				const buttonDiffText = buttonDiff > 0 ? `+${buttonDiff}` : buttonDiff < 0 ? `${buttonDiff}` : '±0';
+				const buttonDiffColor = buttonDiff > 0 ? '#2e7d32' : buttonDiff < 0 ? '#d32f2f' : '#666';
+
+				const comparisonDiv = document.createElement('div');
+				comparisonDiv.style.cssText = 'margin-top: 5px; padding: 5px; background-color: #fff3e0; border-radius: 3px; font-size: 0.8em;';
+				comparisonDiv.innerHTML = `
+					<span style="color: #666;">現在: ${existingPattern.buttons.length}個のボタン</span>
+					→ <span style="color: ${buttonDiffColor}; font-weight: bold;">${buttonDiffText}個のボタン</span>
+				`;
+				div.appendChild(comparisonDiv);
+			}
+
 			fragment.appendChild(div);
 		});
+
+		// 警告がある場合は表示
+		if (validation && validation.warnings && validation.warnings.length > 0) {
+			const warningsDiv = document.createElement('div');
+			warningsDiv.style.cssText = 'background-color: #fff3cd; padding: 10px; margin-top: 10px; border-radius: 4px; border-left: 4px solid #ff9800;';
+			warningsDiv.innerHTML = `
+				<strong>⚠️ 警告 (${validation.warnings.length}件):</strong><br>
+				<div style="margin-top: 5px; font-size: 0.85em; max-height: 100px; overflow-y: auto;">
+					${validation.warnings.map(w => `<div style="margin: 3px 0;">• ${w}</div>`).join('')}
+				</div>
+			`;
+			fragment.appendChild(warningsDiv);
+		}
 
 		container.appendChild(fragment);
 	};
@@ -3144,19 +3255,30 @@ document.addEventListener("DOMContentLoaded", function () {
 				// 暗号化されていない場合は直接検証
 				const validation = validateImportData(data);
 				if (!validation.valid) {
-					alert(CONSTANTS.MESSAGES.IMPORT_INVALID_FILE + '\n' + validation.error);
+					alert(validation.error);
 					return;
 				}
 
+				// 警告がある場合は表示
+				if (validation.warnings && validation.warnings.length > 0) {
+					const warningMessage = '以下の警告がありますが、インポートは続行できます：\n\n' +
+						validation.warnings.join('\n\n') +
+						'\n\n続行しますか？';
+					if (!confirm(warningMessage)) {
+						return;
+					}
+				}
+
 				// インポートオプションを表示
-				displayImportPatternList(data);
+				displayImportPatternList(data, validation);
 				importPasswordSection.style.display = 'none';
 				importOptionsSection.style.display = 'block';
 				importModal.style.display = 'block';
 				importModal.setAttribute('aria-hidden', 'false');
 
-				// データを一時保存
+				// データと検証結果を一時保存
 				importModal._decryptedData = data;
+				importModal._validationResult = validation;
 			}
 		} catch (error) {
 			console.error('ファイル読み込みエラー:', error);
@@ -3182,17 +3304,28 @@ document.addEventListener("DOMContentLoaded", function () {
 			// 検証
 			const validation = validateImportData(decryptedData);
 			if (!validation.valid) {
-				alert(CONSTANTS.MESSAGES.IMPORT_INVALID_FILE + '\n' + validation.error);
+				alert(validation.error);
 				return;
 			}
 
+			// 警告がある場合は表示
+			if (validation.warnings && validation.warnings.length > 0) {
+				const warningMessage = '以下の警告がありますが、インポートは続行できます：\n\n' +
+					validation.warnings.join('\n\n') +
+					'\n\n続行しますか？';
+				if (!confirm(warningMessage)) {
+					return;
+				}
+			}
+
 			// インポートオプションを表示
-			displayImportPatternList(decryptedData);
+			displayImportPatternList(decryptedData, validation);
 			importPasswordSection.style.display = 'none';
 			importOptionsSection.style.display = 'block';
 
-			// データを一時保存
+			// データと検証結果を一時保存
 			importModal._decryptedData = decryptedData;
+			importModal._validationResult = validation;
 
 			// パスワード入力をクリア
 			importPasswordInput.value = '';
