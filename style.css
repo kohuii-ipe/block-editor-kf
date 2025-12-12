@@ -226,11 +226,21 @@ body {
 .input-text-area[contenteditable="true"]:empty:focus::before {
 	color: #bbb;
 }
-.input-area-group button {
+/* ボタンコンテナ（縦並び） */
+.button-container-vertical {
+	display: flex;
+	flex-direction: column;
+	gap: 5px;
 	flex-shrink: 0;
 	margin-left: 10px;
-	padding: 5px 15px;
 	align-self: flex-start;
+}
+
+.input-area-group button {
+	flex-shrink: 0;
+	padding: 5px 15px;
+	align-self: stretch; /* ボタン幅を統一 */
+	width: 100%; /* コンテナ幅に合わせる */
 }
 
 /* 変換ボタンのホバー効果 */

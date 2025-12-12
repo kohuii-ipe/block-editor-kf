@@ -59,9 +59,6 @@ document.addEventListener("DOMContentLoaded", function () {
 		linkItemTemplateInput: document.getElementById("linkItemTemplateInput"),
 		listItemTemplateSection: document.getElementById("listItemTemplateSection"),
 		listItemTemplateInput: document.getElementById("listItemTemplateInput"),
-		containerTemplateSection: document.getElementById("containerTemplateSection"),
-		containerTopTemplateInput: document.getElementById("containerTopTemplateInput"),
-		containerBottomTemplateInput: document.getElementById("containerBottomTemplateInput"),
 		removeLastBrInput: document.getElementById("removeLastBrInput"),
 		allowScriptTagsInput: document.getElementById("allowScriptTagsInput"),
 		closeModalSpan: null, // 後で初期化
@@ -111,7 +108,6 @@ document.addEventListener("DOMContentLoaded", function () {
 		modalTitle, tagModalForm, tagIdInput, tagNameInput, tagTypeSelector,
 		tagTemplateInput, linkItemTemplateSection, linkItemTemplateInput,
 		listItemTemplateSection, listItemTemplateInput,
-		containerTemplateSection, containerTopTemplateInput, containerBottomTemplateInput,
 		removeLastBrInput, allowScriptTagsInput, closeModalSpan, formattingList, saveFormattingButton,
 		exportDataButton, importDataButton, importFileInput,
 		exportModal, exportModalForm, exportPatternSelector, exportAllPatternsCheckbox,
@@ -327,8 +323,7 @@ document.addEventListener("DOMContentLoaded", function () {
 			'link-list': ['[LINK_LIST]'], // 後方互換性
 			'single-link': ['[TEXT]', '[URL]'], // 後方互換性
 			'static': [], // 静的モードはプレースホルダー不要
-			'code': ['[CODE]'], // コードモードは[CODE]が必須
-			'container': ['[CONTENT]'] // コンテナモードは[CONTENT]が必須
+			'code': ['[CODE]'] // コードモードは[CODE]が必須
 		};
 
 		const required = requiredPlaceholders[tagType] || [];
@@ -639,37 +634,16 @@ document.addEventListener("DOMContentLoaded", function () {
 
 		try {
 			const areas = [];
-			// すべての入力エリアを取得（コンテナ内の子エリアも含む）
 			const allGroups = container.querySelectorAll(".input-area-group");
 
 			allGroups.forEach((group) => {
 				const textarea = group.querySelector(".input-text-area");
 				if (textarea) {
-				const tagId = textarea.getAttribute("data-tag-id");
-				const tagInfo = getCustomTagInfo(tagId);
-
-				// コンテナモードの場合は、選択された子エリアIDも保存
-				let content = textarea.innerHTML;
-				if (tagInfo && tagInfo.tagType === "container") {
-					const childAreasInput = group.querySelector(".container-child-areas");
-					if (childAreasInput) {
-						content = childAreasInput.value; // 子エリアIDリストを保存
-					}
-				}
-
-				// カスタム名前を取得
-				const customName = group.getAttribute("data-custom-name") || "";
-
-				// コンテナ内にある子エリアかどうかをチェック
-				const isInsideContainer = group.closest(".container-children-zone") !== null;
-
-				areas.push({
-					tagId: tagId,
-					content: content,
-					groupId: group.id,
-					customName: customName,
-					isInsideContainer: isInsideContainer
-				});
+					areas.push({
+						tagId: textarea.getAttribute("data-tag-id"),
+						content: textarea.innerHTML,
+						groupId: group.id
+					});
 				}
 			});
 
@@ -738,7 +712,7 @@ document.addEventListener("DOMContentLoaded", function () {
 					try {
 						const tagInfo = getCustomTagInfo(area.tagId);
 						if (tagInfo) {
-							createTextarea(area.tagId, tagInfo.tagType, tagInfo.name, area.content, area.customName);
+							createTextarea(area.tagId, tagInfo.tagType, tagInfo.name, area.content);
 						} else {
 							console.warn(`タグID "${area.tagId}" が見つかりません。スキップします。`);
 						}
@@ -1196,8 +1170,6 @@ document.addEventListener("DOMContentLoaded", function () {
 			tagTemplateInput.value = button.template;
 			linkItemTemplateInput.value = button.linkItemTemplate || '<li class="rtoc-item"><a href="[URL]">[TEXT]</a></li>';
 			listItemTemplateInput.value = button.listItemTemplate || '<li>[TEXT]</li>';
-			containerTopTemplateInput.value = button.containerTop || '';
-			containerBottomTemplateInput.value = button.containerBottom || '';
 			removeLastBrInput.checked = button.removeLastBr || false;
 			allowScriptTagsInput.checked = button.allowScriptTags || false;
 		} else {
@@ -1209,8 +1181,6 @@ document.addEventListener("DOMContentLoaded", function () {
 			tagTemplateInput.value = "";
 			linkItemTemplateInput.value = '<li class="rtoc-item"><a href="[URL]">[TEXT]</a></li>';
 			listItemTemplateInput.value = '<li>[TEXT]</li>';
-			containerTopTemplateInput.value = '';
-			containerBottomTemplateInput.value = '';
 			removeLastBrInput.checked = false;
 		}
 
@@ -1255,26 +1225,6 @@ document.addEventListener("DOMContentLoaded", function () {
 			listItemTemplateSection.style.display = "none";
 		}
 
-		// container用のフィールドの表示/非表示を切り替え
-		if (selectedType === "container") {
-			containerTemplateSection.style.display = "block";
-			// コンテナモードではメインのテンプレート入力を非表示に
-			tagTemplateInput.closest("label").parentElement.querySelector("label").style.display = "none";
-			tagTemplateInput.style.display = "none";
-			tagTemplateInput.nextElementSibling.style.display = "none"; // 説明文も非表示
-		} else {
-			containerTemplateSection.style.display = "none";
-			// メインのテンプレート入力を表示に戻す
-			const labelElement = tagTemplateInput.closest("label");
-			if (labelElement) {
-				tagTemplateInput.closest("label").parentElement.querySelector("label").style.display = "";
-			}
-			tagTemplateInput.style.display = "";
-			if (tagTemplateInput.nextElementSibling) {
-				tagTemplateInput.nextElementSibling.style.display = "";
-			}
-		}
-
 		switch (selectedType) {
 			case "multi":
 				placeholder = '例: <p class="item">[TEXT]</p>\n\n【マルチラインモード】\n※各行がそれぞれ個別のタグとして出力されます\n※[TEXT]が各行のテキストに置き換わります';
@@ -1292,9 +1242,6 @@ document.addEventListener("DOMContentLoaded", function () {
 				break;
 			case "code":
 				placeholder = '例:\n<pre><code>[CODE]</code></pre>\n\n【コードモード】\n※入力エリアに貼り付けたコードがそのまま出力されます\n※[CODE]の位置にコード内容が挿入されます\n※HTMLタグなどもそのまま表示されます（エスケープなし）';
-				break;
-			case "container":
-				placeholder = '【コンテナモード】\n※このモードでは下の「開始部分」と「終了部分」の2つの入力欄を使用します\n※選択した子エリアが、開始部分と終了部分の間に挿入されます';
 				break;
 			default:
 				placeholder = "[TEXT] を使って雛形を入力";
@@ -1319,8 +1266,6 @@ document.addEventListener("DOMContentLoaded", function () {
 		const newTemplate = tagTemplateInput.value;
 		const newLinkItemTemplate = linkItemTemplateInput.value;
 		const newListItemTemplate = listItemTemplateInput.value;
-		const newContainerTop = containerTopTemplateInput.value;
-		const newContainerBottom = containerBottomTemplateInput.value;
 		const newRemoveLastBr = removeLastBrInput.checked;
 		const newAllowScriptTags = allowScriptTagsInput.checked;
 
@@ -1331,30 +1276,10 @@ document.addEventListener("DOMContentLoaded", function () {
 		}
 
 		// 入力検証: テンプレートの検証
-		if (newType === 'container') {
-			// コンテナモードの場合は、開始部分と終了部分を検証
-			if (!newContainerTop || newContainerTop.trim() === '') {
-				alert('コンテナ開始部分を入力してください。');
-				return;
-			}
-			if (!newContainerBottom || newContainerBottom.trim() === '') {
-				alert('コンテナ終了部分を入力してください。');
-				return;
-			}
-			// 開始部分と終了部分を結合してバリデーション（[CONTENT]を含める）
-			const combinedTemplate = newContainerTop + '\n[CONTENT]\n' + newContainerBottom;
-			const templateValidation = validateTemplate(combinedTemplate, newType, newAllowScriptTags);
-			if (!templateValidation.valid) {
-				alert('テンプレートエラー:\n' + templateValidation.error);
-				return;
-			}
-		} else {
-			// 通常のモードの場合
-			const templateValidation = validateTemplate(newTemplate, newType, newAllowScriptTags);
-			if (!templateValidation.valid) {
-				alert('テンプレートエラー:\n' + templateValidation.error);
-				return;
-			}
+		const templateValidation = validateTemplate(newTemplate, newType, newAllowScriptTags);
+		if (!templateValidation.valid) {
+			alert('テンプレートエラー:\n' + templateValidation.error);
+			return;
 		}
 
 		// link-listモードの場合、linkItemTemplateも検証
@@ -1384,8 +1309,6 @@ document.addEventListener("DOMContentLoaded", function () {
 				button.template = newTemplate;
 				button.linkItemTemplate = newLinkItemTemplate;
 				button.listItemTemplate = newListItemTemplate;
-				button.containerTop = newContainerTop;
-				button.containerBottom = newContainerBottom;
 				button.removeLastBr = newRemoveLastBr;
 				button.allowScriptTags = newAllowScriptTags;
 			}
@@ -1400,8 +1323,6 @@ document.addEventListener("DOMContentLoaded", function () {
 				tagType: newType,
 				linkItemTemplate: newLinkItemTemplate,
 				listItemTemplate: newListItemTemplate,
-				containerTop: newContainerTop,
-				containerBottom: newContainerBottom,
 				removeLastBr: newRemoveLastBr,
 				allowScriptTags: newAllowScriptTags,
 			});
@@ -1834,9 +1755,8 @@ document.addEventListener("DOMContentLoaded", function () {
 			return output + "\n";
 		}
 
-		// 静的モードとコンテナモード以外では、入力が空の場合は空文字を返す
-		// コンテナモードは子エリアの選択が入力なので、テキストエリアが空でもOK
-		if (tagType !== "container" && (!htmlContent || htmlContent.trim() === "")) return "";
+		// 静的モード以外では、入力が空の場合は空文字を返す
+		if (!htmlContent || htmlContent.trim() === "") return "";
 
 		// link, link-list, single-link, code モードの場合はプレーンテキストを取得、それ以外は書式を保持
 		const text = (tagInfo.tagType === "link" || tagInfo.tagType === "link-list" || tagInfo.tagType === "single-link" || tagInfo.tagType === "code")
@@ -2026,61 +1946,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
 			// [CODE]プレースホルダーを置換
 			output = templateString.replace(/\[CODE\]/g, text);
-
-			// 最後の項目から <br> を削除するオプション
-			if (tagInfo.removeLastBr) {
-				output = output.replace(/<br\s*\/?\s*>\s*$/i, '').trimEnd();
-			}
-		} else if (tagType === "container") {
-			// コンテナモードの処理 (container)
-			// 選択された子エリアのHTMLを取得して結合
-
-			// このコンテナエリアのgroupDivを取得
-			const containerGroup = textareaElement.closest(".input-area-group");
-			if (!containerGroup) {
-				return `<!-- 警告: コンテナエリアが見つかりません -->\n`;
-			}
-
-			// 選択された子エリアのIDリストを取得
-			const childAreasInput = containerGroup.querySelector(".container-child-areas");
-			if (!childAreasInput) {
-				return `<!-- 警告: 子エリアの選択情報が見つかりません -->\n`;
-			}
-
-			const selectedIds = (childAreasInput.value || "").split(",").filter(id => id.trim());
-
-			// コンテナの開始部分と終了部分を取得
-			const containerTop = tagInfo.containerTop || '';
-			const containerBottom = tagInfo.containerBottom || '';
-
-			if (selectedIds.length === 0) {
-				// 子エリアが選択されていない場合
-				output = containerTop + "\n<!-- 子エリアが選択されていません -->\n" + containerBottom;
-			} else {
-				// 選択された子エリアを変換して結合
-				const childHtmlArray = [];
-
-				selectedIds.forEach(areaId => {
-					const childArea = document.getElementById(areaId);
-					if (childArea) {
-						const childTextarea = childArea.querySelector(".input-text-area");
-						if (childTextarea) {
-							// 子エリアを変換（再帰的に変換されるため、子がコンテナの場合も対応）
-							const childHtml = convertTextToHtmlString(childTextarea);
-							if (childHtml && childHtml.trim()) {
-								// 末尾の改行を削除して追加（最後にまとめて改行を入れるため）
-								childHtmlArray.push(childHtml.trim());
-							}
-						}
-					}
-				});
-
-				// 子エリアのHTMLを結合
-				const contentHtml = childHtmlArray.join("\n");
-
-				// 開始部分 + 子コンテンツ + 終了部分
-				output = containerTop + "\n" + contentHtml + "\n" + containerBottom;
-			}
 
 			// 最後の項目から <br> を削除するオプション
 			if (tagInfo.removeLastBr) {
@@ -2342,53 +2207,14 @@ document.addEventListener("DOMContentLoaded", function () {
 		return convertedText;
 	};
 
-	// コンテナから要素がドラッグアウトされた際の状態更新関数
-	const updateContainerAfterDragOut = (childrenContainer, draggedItemId) => {
-		// 親コンテナ要素を取得
-		const containerGroup = childrenContainer.closest(".input-area-group");
-		if (!containerGroup) return;
-
-		// 隠しフィールドから選択IDリストを取得
-		const childAreasInput = containerGroup.querySelector(".container-child-areas");
-		if (!childAreasInput) return;
-
-		// IDリストから削除
-		const selectedIds = (childAreasInput.value || "").split(",").filter(id => id.trim() && id !== draggedItemId);
-		childAreasInput.value = selectedIds.join(",");
-
-		// 対応するチェックボックスを解除
-		const checkboxContainer = containerGroup.querySelector(".container-checkbox-list");
-		if (checkboxContainer) {
-			const checkbox = checkboxContainer.querySelector(`input[type=checkbox][value="${draggedItemId}"]`);
-			if (checkbox) {
-				checkbox.checked = false;
-			}
-		}
-
-		// プレースホルダーを表示（子が空になった場合）
-		const remainingChildren = childrenContainer.querySelectorAll(".input-area-group");
-		const placeholderMsg = childrenContainer.querySelector(".container-placeholder");
-		if (remainingChildren.length === 0 && placeholderMsg) {
-			placeholderMsg.style.display = "block";
-		}
-	};
-
 	// テキストエリアを作成し、選択された位置に挿入する関数 (引数を変更)
-	const createTextarea = (tagId, tagType, tagName, initialContent = "", customName = "") => {
+	const createTextarea = (tagId, tagType, tagName, initialContent = "") => {
 		areaIndex++;
 		const groupDiv = document.createElement("div");
 		groupDiv.className = "input-area-group";
 		groupDiv.id = `area-group-${areaIndex}`;
 		groupDiv.setAttribute('role', 'listitem');
-
-		// カスタム名前がある場合はそれを使用
-		const displayName = customName || tagName;
-		groupDiv.setAttribute('aria-label', `入力エリア: ${displayName}`);
-
-		// カスタム名前を保存
-		if (customName) {
-			groupDiv.setAttribute("data-custom-name", customName);
-		}
+		groupDiv.setAttribute('aria-label', `入力エリア: ${tagName}`);
 
 		// AbortControllerでイベントリスナーを管理（メモリリーク対策）
 		const abortController = new AbortController();
@@ -2408,38 +2234,8 @@ document.addEventListener("DOMContentLoaded", function () {
 		tagLabel.appendChild(numberPrefix);
 
 		const tagTextSpan = document.createElement("span");
-		tagTextSpan.textContent = displayName;
-		tagTextSpan.style.cursor = "text";
-		tagTextSpan.title = "ダブルクリックで名前を変更";
+		tagTextSpan.textContent = tagName;
 		tagLabel.appendChild(tagTextSpan);
-
-		// ダブルクリックで名前変更
-		tagTextSpan.addEventListener("dblclick", (e) => {
-			e.stopPropagation(); // ドラッグイベントを妨げない
-			const currentName = tagTextSpan.textContent;
-			const newName = prompt("新しい名前を入力してください:", currentName);
-
-			if (newName !== null && newName.trim() !== "") {
-				// タグ名を更新
-				tagTextSpan.textContent = newName.trim();
-
-				// カスタム名前をデータ属性として保存
-				groupDiv.setAttribute("data-custom-name", newName.trim());
-
-				// aria-labelも更新
-				groupDiv.setAttribute('aria-label', `入力エリア: ${newName.trim()}`);
-				convertButton.setAttribute('aria-label', `${newName.trim()}入力エリアを個別に変換`);
-				deleteButton.setAttribute('aria-label', `${newName.trim()}入力エリアを削除`);
-
-				// プレースホルダーも更新
-				const currentPlaceholder = newTextarea.getAttribute("data-placeholder");
-				const updatedPlaceholder = currentPlaceholder.replace(/【.*?】/, `【${newName.trim()}】`);
-				newTextarea.setAttribute("data-placeholder", updatedPlaceholder);
-
-				// 保存
-				saveInputAreas();
-			}
-		}, { signal });
 
 		// ドラッグイベント（ラベルのみ）（signalオプションでメモリリーク防止）
 		tagLabel.addEventListener("dragstart", (e) => {
@@ -2486,10 +2282,6 @@ document.addEventListener("DOMContentLoaded", function () {
 			const draggingGroup = document.querySelector(".dragging-input-area");
 			if (!draggingGroup || draggingGroup === groupDiv) return;
 
-			// コンテナから出されたかチェック
-			const previousParent = draggingGroup.parentElement;
-			const wasInContainer = previousParent && previousParent.classList.contains("container-children-zone");
-
 			// 位置を判定
 			const rect = groupDiv.getBoundingClientRect();
 			const midpoint = rect.top + rect.height / 2;
@@ -2500,15 +2292,6 @@ document.addEventListener("DOMContentLoaded", function () {
 			} else {
 				// 下に挿入
 				container.insertBefore(draggingGroup, groupDiv.nextSibling);
-			}
-
-			// スタイルをリセット
-			draggingGroup.style.marginLeft = "";
-			draggingGroup.style.opacity = "";
-
-			// コンテナから出た場合、元のコンテナの状態を更新
-			if (wasInContainer) {
-				updateContainerAfterDragOut(previousParent, draggingGroup.id);
 			}
 
 			updateInsertionPoints();
@@ -2531,7 +2314,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
 		newTextarea.setAttribute("role", "textbox");
 		newTextarea.setAttribute("aria-multiline", "true");
-		newTextarea.setAttribute("aria-label", `${displayName}のテキスト入力エリア`);
+		newTextarea.setAttribute("aria-label", `${tagName}のテキスト入力エリア`);
 		newTextarea.setAttribute("data-tag-id", tagId); // タグIDをデータ属性として保持
 		// 初期コンテンツを設定（空の場合は完全に空にしてプレースホルダーを表示）
 		if (initialContent && initialContent.trim() !== "") {
@@ -2549,34 +2332,33 @@ document.addEventListener("DOMContentLoaded", function () {
 			handleFormattedPaste(e, newTextarea);
 		}, { signal });
 
-		let placeholderText = `${displayName}タグ用のテキストエリア`;
+		let placeholderText = `${tagName}タグ用のテキストエリア`;
 
 		if (tagType === "multi") {
-			placeholderText = `【${displayName}】マルチラインモード：各行が個別のタグになります`;
+			placeholderText = `【${tagName}】マルチラインモード：各行が個別のタグになります`;
 		} else if (tagType === "p-list") {
-			placeholderText = `【${displayName}】段落+リストモード：通常の行は段落、「-」または「*」で始まる行はリスト項目になります`;
+			placeholderText = `【${tagName}】段落+リストモード：通常の行は段落、「-」または「*」で始まる行はリスト項目になります`;
 		} else if (tagType === "link-list") {
-			placeholderText = `【${displayName}】リンクリストモード：各行に[リンクテキスト](URL)の形式で入力してください`;
+			placeholderText = `【${tagName}】リンクリストモード：各行に[リンクテキスト](URL)の形式で入力してください`;
 		} else if (tagType === "single-link") {
-			placeholderText = `【${displayName}】単一リンクモード：[リンクテキスト](URL)の形式で指定。例：クリック[こちら](https://example.com)してください`;
+			placeholderText = `【${tagName}】単一リンクモード：[リンクテキスト](URL)の形式で指定。例：クリック[こちら](https://example.com)してください`;
 		} else if (tagType === "static") {
-			placeholderText = `【${displayName}】静的モード：テンプレートで設定した内容がそのまま出力されます（入力不可）`;
+			placeholderText = `【${tagName}】静的モード：テンプレートで設定した内容がそのまま出力されます（入力不可）`;
 		} else if (tagType === "code") {
-			placeholderText = `【${displayName}】コードモード：コードを貼り付けてください。HTML特殊文字（<, >, &など）は自動的にエスケープされます`;
-		} else if (tagType === "container") {
-			placeholderText = `【${displayName}】コンテナモード：以下のチェックボックスで包含する子エリアを選択してください`;
+			placeholderText = `【${tagName}】コードモード：コードを貼り付けてください。HTML特殊文字（<, >, &など）は自動的にエスケープされます`;
 		} else {
 			// 古いモード (single, list, link) のための後方互換性
-			placeholderText = `${displayName}エリア。テキストを入力してください。`;
+			placeholderText = `${tagName}エリア。テキストを入力してください。`;
 		}
 		newTextarea.setAttribute("data-placeholder", placeholderText);
 
 		const convertButton = document.createElement("button");
 		convertButton.textContent = "変換";
 		convertButton.className = "convert-input-button";
-		convertButton.setAttribute('aria-label', `${displayName}入力エリアを個別に変換`);
+		convertButton.setAttribute('aria-label', `${tagName}入力エリアを個別に変換`);
 		convertButton.style.backgroundColor = "#4CAF50";
 		convertButton.style.color = "white";
+		convertButton.style.marginRight = "5px";
 
 		convertButton.addEventListener("click", () => {
 			// 変換直前に設定を保存し、最新のテンプレートを取得できるように保証
@@ -2598,7 +2380,7 @@ document.addEventListener("DOMContentLoaded", function () {
 		const deleteButton = document.createElement("button");
 		deleteButton.textContent = "削除";
 		deleteButton.className = "delete-input-button";
-		deleteButton.setAttribute('aria-label', `${displayName}入力エリアを削除`);
+		deleteButton.setAttribute('aria-label', `${tagName}入力エリアを削除`);
 
 		deleteButton.addEventListener("click", () => {
 			// イベントリスナーをクリーンアップしてメモリリークを防止
@@ -2611,318 +2393,9 @@ document.addEventListener("DOMContentLoaded", function () {
 		}, { signal });
 
 		groupDiv.appendChild(tagLabel);
-
-		// コンテナモードの場合は、特別な構造を作成
-		if (tagType === "container") {
-			// テキストエリアは非表示にして編集不可に
-			newTextarea.style.display = "none";
-
-			// コンテナの開始部分を取得して表示
-			const tagInfo = getCustomTagInfo(tagId);
-			const containerTopHtml = tagInfo?.containerTop || '';
-			const containerBottomHtml = tagInfo?.containerBottom || '';
-
-			// コンテナ開始部分の表示エリア
-			const containerTopDisplay = document.createElement("div");
-			containerTopDisplay.className = "container-visual-top";
-			containerTopDisplay.style.backgroundColor = "#e3f2fd";
-			containerTopDisplay.style.border = "2px solid #2196F3";
-			containerTopDisplay.style.borderBottom = "none";
-			containerTopDisplay.style.borderRadius = "4px 4px 0 0";
-			containerTopDisplay.style.padding = "8px 12px";
-			containerTopDisplay.style.fontSize = "13px";
-			containerTopDisplay.style.fontFamily = "monospace";
-			containerTopDisplay.style.color = "#1565c0";
-			containerTopDisplay.style.whiteSpace = "pre-wrap";
-			containerTopDisplay.style.wordWrap = "break-word";
-			containerTopDisplay.style.fontWeight = "bold";
-			containerTopDisplay.textContent = '▼ ' + (containerTopHtml || '<!-- 開始部分が未設定 -->');
-
-			// 子エリアを入れるコンテナ (視覚的にネストを表現)
-			const childrenContainer = document.createElement("div");
-			childrenContainer.className = "container-children-zone";
-			childrenContainer.style.border = "2px solid #2196F3";
-			childrenContainer.style.borderTop = "none";
-			childrenContainer.style.borderBottom = "none";
-			childrenContainer.style.backgroundColor = "#f5f5f5";
-			childrenContainer.style.padding = "10px 10px 10px 30px"; // 左に大きくインデント
-			childrenContainer.style.minHeight = "60px";
-			childrenContainer.style.position = "relative";
-
-			// ドラッグ&ドロップ: 子エリアをコンテナに入れる
-			childrenContainer.addEventListener("dragover", (e) => {
-				e.preventDefault();
-				e.stopPropagation();
-				const draggingGroup = document.querySelector(".dragging-input-area");
-
-				// コンテナ自身はドロップ不可
-				if (draggingGroup && draggingGroup !== groupDiv) {
-					e.dataTransfer.dropEffect = "move";
-					childrenContainer.style.backgroundColor = "#c8e6c9"; // ドロップ可能の視覚的フィードバック
-					childrenContainer.style.borderColor = "#4CAF50";
-				}
-			}, { signal });
-
-			childrenContainer.addEventListener("dragleave", (e) => {
-				// 子要素へのdragleaveは無視
-				if (e.target === childrenContainer) {
-					childrenContainer.style.backgroundColor = "#f5f5f5";
-					childrenContainer.style.borderColor = "#2196F3";
-				}
-			}, { signal });
-
-			childrenContainer.addEventListener("drop", (e) => {
-				e.preventDefault();
-				e.stopPropagation();
-				childrenContainer.style.backgroundColor = "#f5f5f5";
-				childrenContainer.style.borderColor = "#2196F3";
-
-				const draggingGroup = document.querySelector(".dragging-input-area");
-				if (!draggingGroup || draggingGroup === groupDiv) return;
-
-				// コンテナモードのエリアはドロップ不可
-				const draggedTagType = draggingGroup.querySelector(".input-text-area")?.getAttribute("data-tag-id");
-				const draggedTagInfo = getCustomTagInfo(draggedTagType);
-				if (draggedTagInfo && draggedTagInfo.tagType === "container") {
-					alert("コンテナの中にコンテナを入れることはできません");
-					return;
-				}
-
-				// プレースホルダーを非表示
-				if (placeholderMsg) placeholderMsg.style.display = "none";
-
-				// コンテナ内に移動
-				childrenContainer.appendChild(draggingGroup);
-				draggingGroup.style.marginLeft = "0px";
-				draggingGroup.style.opacity = "0.95";
-
-				// 選択状態を更新
-				const currentChildren = Array.from(childrenContainer.querySelectorAll(".input-area-group"));
-				const selectedIds = currentChildren.map(child => child.id);
-				childAreasInput.value = selectedIds.join(",");
-
-				// 対応するチェックボックスをチェック状態にする
-				const checkboxContainer = groupDiv.querySelector(".container-checkbox-list");
-				if (checkboxContainer) {
-					const checkbox = checkboxContainer.querySelector(`input[type=checkbox][value="${draggingGroup.id}"]`);
-					if (checkbox) {
-						checkbox.checked = true;
-					}
-				}
-
-				updateInsertionPoints();
-				saveInputAreas();
-			}, { signal });
-
-			// プレースホルダーメッセージ
-			const placeholderMsg = document.createElement("div");
-			placeholderMsg.className = "container-placeholder";
-			placeholderMsg.style.color = "#999";
-			placeholderMsg.style.fontStyle = "italic";
-			placeholderMsg.style.padding = "20px";
-			placeholderMsg.style.textAlign = "center";
-			placeholderMsg.textContent = "ここに入力エリアをドラッグ&ドロップしてください";
-			placeholderMsg.style.pointerEvents = "none"; // ドラッグイベントを妨げない
-			childrenContainer.appendChild(placeholderMsg);
-
-			// チェックボックス選択エリア（折りたたみ可能）
-			const selectionToggle = document.createElement("button");
-			selectionToggle.textContent = "⚙️ 子エリアを選択";
-			selectionToggle.style.fontSize = "12px";
-			selectionToggle.style.padding = "5px 10px";
-			selectionToggle.style.marginBottom = "5px";
-			selectionToggle.style.backgroundColor = "#fff";
-			selectionToggle.style.border = "1px solid #ccc";
-			selectionToggle.style.borderRadius = "3px";
-			selectionToggle.style.cursor = "pointer";
-
-			const checkboxContainer = document.createElement("div");
-			checkboxContainer.className = "container-checkbox-list";
-			checkboxContainer.style.display = "none"; // 初期は非表示
-			checkboxContainer.style.border = "1px solid #ddd";
-			checkboxContainer.style.padding = "10px";
-			checkboxContainer.style.marginBottom = "5px";
-			checkboxContainer.style.backgroundColor = "#fff";
-			checkboxContainer.style.maxHeight = "150px";
-			checkboxContainer.style.overflowY = "auto";
-			checkboxContainer.style.borderRadius = "3px";
-
-			selectionToggle.addEventListener("click", () => {
-				if (checkboxContainer.style.display === "none") {
-					checkboxContainer.style.display = "block";
-					selectionToggle.textContent = "⚙️ 選択を閉じる";
-				} else {
-					checkboxContainer.style.display = "none";
-					selectionToggle.textContent = "⚙️ 子エリアを選択";
-				}
-			});
-
-			// コンテナ終了部分の表示エリア
-			const containerBottomDisplay = document.createElement("div");
-			containerBottomDisplay.className = "container-visual-bottom";
-			containerBottomDisplay.style.backgroundColor = "#e3f2fd";
-			containerBottomDisplay.style.border = "2px solid #2196F3";
-			containerBottomDisplay.style.borderTop = "none";
-			containerBottomDisplay.style.borderRadius = "0 0 4px 4px";
-			containerBottomDisplay.style.padding = "8px 12px";
-			containerBottomDisplay.style.fontSize = "13px";
-			containerBottomDisplay.style.fontFamily = "monospace";
-			containerBottomDisplay.style.color = "#1565c0";
-			containerBottomDisplay.style.whiteSpace = "pre-wrap";
-			containerBottomDisplay.style.wordWrap = "break-word";
-			containerBottomDisplay.style.fontWeight = "bold";
-			containerBottomDisplay.textContent = '▲ ' + (containerBottomHtml || '<!-- 終了部分が未設定 -->');
-
-			// 子エリア選択情報を保存する隠しフィールド
-			const childAreasInput = document.createElement("input");
-			childAreasInput.type = "hidden";
-			childAreasInput.className = "container-child-areas";
-			childAreasInput.value = initialContent || ""; // 保存されたIDリストを復元
-			groupDiv.appendChild(childAreasInput);
-
-			// チェックボックスリストを更新する関数
-			const updateCheckboxList = () => {
-				checkboxContainer.innerHTML = "";
-				const allAreas = container.querySelectorAll(".input-area-group");
-				let hasOtherAreas = false;
-
-				// 保存されている選択状態を取得
-				const selectedIds = (childAreasInput.value || "").split(",").filter(id => id.trim());
-
-				allAreas.forEach((area) => {
-					// 自分自身とコンテナモードのエリアは除外
-					if (area === groupDiv) return;
-					const areaTagType = area.querySelector(".input-text-area")?.getAttribute("data-tag-id");
-					const customTagInfo = getCustomTagInfo(areaTagType);
-					if (customTagInfo && customTagInfo.tagType === "container") return;
-
-					hasOtherAreas = true;
-
-					const label = document.createElement("label");
-					label.style.display = "block";
-					label.style.marginBottom = "5px";
-					label.style.cursor = "pointer";
-
-					const checkbox = document.createElement("input");
-					checkbox.type = "checkbox";
-					checkbox.value = area.id;
-					checkbox.style.marginRight = "8px";
-
-					// 保存されている選択状態を復元
-					// または実際にchildrenContainerに入っているかをチェック
-					const isInContainer = childrenContainer.contains(area);
-					if (selectedIds.includes(area.id) || isInContainer) {
-						checkbox.checked = true;
-					}
-
-					// チェック状態が変更されたら、エリアを移動して保存
-					checkbox.addEventListener("change", (e) => {
-						const childArea = document.getElementById(checkbox.value);
-						if (e.target.checked) {
-							// チェックされたら子エリアをコンテナ内に移動
-							if (childArea && !childrenContainer.contains(childArea)) {
-								// プレースホルダーを非表示
-								if (placeholderMsg) placeholderMsg.style.display = "none";
-
-								// 元の位置を記憶（データ属性に保存）
-								childArea.dataset.originalNextSibling = childArea.nextElementSibling?.id || '';
-								childrenContainer.appendChild(childArea);
-								// インデント表示
-								childArea.style.marginLeft = "0px";
-								childArea.style.opacity = "0.95";
-							}
-						} else {
-							// チェック解除されたらコンテナから出す
-							if (childArea && childrenContainer.contains(childArea)) {
-								// 元の位置に戻す（コンテナの直後に配置）
-								container.insertBefore(childArea, groupDiv.nextElementSibling);
-								childArea.style.marginLeft = "";
-								childArea.style.opacity = "";
-
-								// 子エリアがなくなったらプレースホルダーを表示
-								const remainingChildren = childrenContainer.querySelectorAll(".input-area-group");
-								if (remainingChildren.length === 0 && placeholderMsg) {
-									placeholderMsg.style.display = "block";
-								}
-							}
-						}
-
-						// 選択状態を保存
-						const checkedBoxes = checkboxContainer.querySelectorAll("input[type=checkbox]:checked");
-						const selectedIds = Array.from(checkedBoxes).map(cb => cb.value);
-						childAreasInput.value = selectedIds.join(",");
-						updateInsertionPoints();
-						saveInputAreas();
-					}, { signal });
-
-					const numberPrefix = area.querySelector(".input-label-tag .number-prefix")?.textContent || "";
-					const tagName = area.querySelector(".input-label-tag span:last-child")?.textContent || "無名エリア";
-					const tagLabelText = numberPrefix ? `${numberPrefix} ${tagName}` : tagName;
-					const labelText = document.createTextNode(` ${tagLabelText}`);
-
-					label.appendChild(checkbox);
-					label.appendChild(labelText);
-					checkboxContainer.appendChild(label);
-				});
-
-				if (!hasOtherAreas) {
-					checkboxContainer.innerHTML = "<p style='color: #999; margin: 0;'>包含できる子エリアがありません。先に他のタグボタンで入力エリアを作成してください。</p>";
-				}
-			};
-
-			// 初期化時にチェックボックスリストを作成
-			updateCheckboxList();
-
-			// 保存されている子エリアを復元（初期ロード時）
-			const savedSelectedIds = (childAreasInput.value || "").split(",").filter(id => id.trim());
-			setTimeout(() => {
-				savedSelectedIds.forEach(areaId => {
-					const childArea = document.getElementById(areaId);
-					if (childArea && !childrenContainer.contains(childArea)) {
-						childrenContainer.appendChild(childArea);
-						childArea.style.marginLeft = "0px";
-						childArea.style.opacity = "0.95";
-					}
-				});
-				// 子エリアがあればプレースホルダーを非表示
-				if (savedSelectedIds.length > 0 && placeholderMsg) {
-					placeholderMsg.style.display = "none";
-				}
-			}, 100); // 少し遅延させてDOM構築後に実行
-
-			// 他のエリアが追加・削除されたときにリストを更新
-			// MutationObserverでコンテナの変更を監視
-			const observer = new MutationObserver(() => {
-				updateCheckboxList();
-			});
-			observer.observe(container, { childList: true });
-
-			// クリーンアップ時にオブザーバーも停止
-			const originalCleanup = groupDiv._cleanup;
-			groupDiv._cleanup = () => {
-				observer.disconnect();
-				if (originalCleanup) originalCleanup();
-			};
-
-			// 構造を組み立て: 開始タグ → 子エリア → 終了タグ
-			groupDiv.appendChild(containerTopDisplay);
-
-			// 選択ボタンとチェックボックスを子エリアコンテナに配置
-			childrenContainer.appendChild(selectionToggle);
-			childrenContainer.appendChild(checkboxContainer);
-
-			groupDiv.appendChild(childrenContainer);
-			groupDiv.appendChild(containerBottomDisplay);
-		}
-
-		// ボタンコンテナを作成（縦並び）
-		const buttonContainer = document.createElement("div");
-		buttonContainer.className = "button-container-vertical";
-		buttonContainer.appendChild(convertButton);
-		buttonContainer.appendChild(deleteButton);
-
 		groupDiv.appendChild(newTextarea);
-		groupDiv.appendChild(buttonContainer);
+		groupDiv.appendChild(convertButton);
+		groupDiv.appendChild(deleteButton);
 
 		const insertPoint = insertionPointSelector.value;
 
@@ -3085,11 +2558,7 @@ document.addEventListener("DOMContentLoaded", function () {
 				outputHtmlString = "<!-- 警告: 入力されたテキストエリアがありません -->\n";
 			} else {
 				allTextareas.forEach((textarea) => {
-					// コンテナ内にある子エリアはスキップ（コンテナ自体の変換時に含まれるため）
-					const isInsideContainer = textarea.closest(".container-children-zone") !== null;
-					if (!isInsideContainer) {
-						outputHtmlString += convertTextToHtmlString(textarea);
-					}
+					outputHtmlString += convertTextToHtmlString(textarea);
 				});
 			}
 
