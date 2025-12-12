@@ -1285,7 +1285,7 @@ document.addEventListener("DOMContentLoaded", function () {
 			case "link":
 			case "link-list":  // 後方互換性
 			case "single-link":  // 後方互換性
-				placeholder = '例（単一）: <a href="[URL]" class="btn">[TEXT]</a>\n例（複数）: <ul>[LINK_LIST]</ul>\n\n【リンクモード】\n※Markdown形式でリンクを記述: [リンクテキスト](URL)\n※1つのリンク: [TEXT]と[URL]を使用\n※複数のリンク: [LINK_LIST]を使用（下の「リンク項目の雛形」も設定）\n※自動的にリンク数を検出して適切に変換します';
+				placeholder = '例（単一）: <a href="[URL]" class="btn">[TEXT]</a>\n例（複数）: <ul>[LINK_LIST]</ul>\n\n【リンクモード】\n※1行目にテキスト、2行目にURLを記述（この繰り返し）\n※1つのリンク: [TEXT]と[URL]を使用\n※複数のリンク: [LINK_LIST]を使用（下の「リンク項目の雛形」も設定）\n※自動的にリンク数を検出して適切に変換します';
 				break;
 			case "static":
 				placeholder = '【静的モード】\n※テンプレート欄に入力したHTMLがそのまま出力されます\n※入力エリアは無効化されます（入力不可）\n※固定のHTMLブロックや定型文を出力するのに便利です\n\n例:\n<div class="alert">\n<p>このメッセージは固定です</p>\n</div>';
@@ -1850,22 +1850,7 @@ document.addEventListener("DOMContentLoaded", function () {
 			return `<!-- 警告: タグ (${tagInfo.name}) の雛形が空のためスキップされました -->\n`;
 		}
 
-		if (tagType === "link") {
-			// リンクタグ系の特別処理 (link)
-			const lines = text.trim().split("\n").map((line) => line.trim());
-			const linkText = lines[0] || "リンク";
-			const url = lines[1] || "";
-
-			if (url) {
-				output = templateString.replace(/\[TEXT\]/g, linkText).replace(/\[URL\]/g, url);
-				// 最後の項目から <br> を削除するオプション
-				if (tagInfo.removeLastBr) {
-					output = output.replace(/<br\s*\/?\s*>\s*$/i, '').trimEnd();
-				}
-			} else {
-				output = `<!-- 警告: リンクエリアですがURLが2行目に指定されていません (${linkText}) -->\n`;
-			}
-		} else if (tagType === "p-list") {
+		if (tagType === "p-list") {
 			// P+リストタグの処理 (p-list) - 複数段落対応版
 			const lines = text.trim().split("\n");
 			const paragraphLines = [];
@@ -1977,48 +1962,55 @@ document.addEventListener("DOMContentLoaded", function () {
 				output = `<!-- 警告: テキストが入力されていません -->\n`;
 			}
 		} else if (tagType === "link" || tagType === "single-link" || tagType === "link-list") {
-			// 統合リンクモードの処理 (link) - 自動検出で単一/複数リンクに対応
+			// 統合リンクモードの処理 (link) - 行ごとにテキストとURLのペアで指定
 			// 後方互換性のため "single-link" と "link-list" も受け付ける
-			const linkPattern = /\[([^\]]+)\]\(([^\)]+)\)/g;
-			const matches = [...text.matchAll(linkPattern)];
+			// 形式: 奇数行がテキスト、偶数行がURL
+			const lines = text.trim().split("\n").map(line => line.trim()).filter(line => line !== "");
 
-			if (matches.length === 0) {
-				output = `<!-- 警告: [リンクテキスト](URL)の形式でリンクを指定してください。例: [こちら](https://example.com) -->\n`;
-			} else if (matches.length === 1) {
-				// 単一リンク: [TEXT]と[URL]を使用
-				const linkText = matches[0][1];
-				const linkUrl = matches[0][2];
-
-				output = templateString
-					.replace(/\[TEXT\]/g, linkText)
-					.replace(/\[URL\]/g, linkUrl);
-
-				// 最後の項目から <br> を削除するオプション
-				if (tagInfo.removeLastBr) {
-					output = output.replace(/<br\s*\/?\s*>\s*$/i, '').trimEnd();
-				}
+			if (lines.length === 0) {
+				output = `<!-- 警告: リンクテキストとURLを指定してください。形式: 1行目=テキスト、2行目=URL -->\n`;
+			} else if (lines.length % 2 !== 0) {
+				output = `<!-- 警告: テキストとURLのペアが正しくありません。テキストの次の行にURLを記述してください。 -->\n`;
 			} else {
-				// 複数リンク: [LINK_LIST]を使用
-				const linkItems = [];
-				const linkItemTemplate = tagInfo.linkItemTemplate || '<li class="rtoc-item"><a href="[URL]">[TEXT]</a></li>';
+				// ペアの数を計算
+				const pairCount = lines.length / 2;
 
-				matches.forEach((match) => {
-					const linkText = match[1];
-					const linkUrl = match[2];
-					const itemHtml = linkItemTemplate
+				if (pairCount === 1) {
+					// 単一リンク: [TEXT]と[URL]を使用
+					const linkText = lines[0];
+					const linkUrl = lines[1];
+
+					output = templateString
 						.replace(/\[TEXT\]/g, linkText)
 						.replace(/\[URL\]/g, linkUrl);
-					linkItems.push(itemHtml);
-				});
 
-				// 最後の項目から <br> を削除するオプション
-				if (tagInfo.removeLastBr && linkItems.length > 0) {
-					const lastIndex = linkItems.length - 1;
-					linkItems[lastIndex] = linkItems[lastIndex].replace(/<br\s*\/?\s*>\s*$/i, '').trimEnd();
+					// 最後の項目から <br> を削除するオプション
+					if (tagInfo.removeLastBr) {
+						output = output.replace(/<br\s*\/?\s*>\s*$/i, '').trimEnd();
+					}
+				} else {
+					// 複数リンク: [LINK_LIST]を使用
+					const linkItems = [];
+					const linkItemTemplate = tagInfo.linkItemTemplate || '<li class="rtoc-item"><a href="[URL]">[TEXT]</a></li>';
+
+					for (let i = 0; i < lines.length; i += 2) {
+						const linkText = lines[i];
+						const linkUrl = lines[i + 1];
+						const itemHtml = linkItemTemplate
+							.replace(/\[TEXT\]/g, linkText)
+							.replace(/\[URL\]/g, linkUrl);
+						linkItems.push(itemHtml);
+					}
+
+					// 最後の項目から <br> を削除するオプション
+					if (tagInfo.removeLastBr && linkItems.length > 0) {
+						const lastIndex = linkItems.length - 1;
+						linkItems[lastIndex] = linkItems[lastIndex].replace(/<br\s*\/?\s*>\s*$/i, '').trimEnd();
+					}
+
+					const linkListContent = linkItems.join("\n");
+					output = templateString.replace(/\[LINK_LIST\]/g, linkListContent.trim());
 				}
-
-				const linkListContent = linkItems.join("\n");
-				output = templateString.replace(/\[LINK_LIST\]/g, linkListContent.trim());
 			}
 		} else if (tagType === "code") {
 			// コードモードの処理 (code)
