@@ -1972,24 +1972,12 @@ document.addEventListener("DOMContentLoaded", function () {
 			} else if (lines.length % 2 !== 0) {
 				output = `<!-- 警告: テキストとURLのペアが正しくありません。テキストの次の行にURLを記述してください。 -->\n`;
 			} else {
-				// ペアの数を計算
-				const pairCount = lines.length / 2;
+				// テンプレートがどのプレースホルダーを使用しているかチェック
+				const usesLinkList = templateString.includes('[LINK_LIST]');
+				const usesSingleLink = templateString.includes('[TEXT]') && templateString.includes('[URL]');
 
-				if (pairCount === 1) {
-					// 単一リンク: [TEXT]と[URL]を使用
-					const linkText = lines[0];
-					const linkUrl = lines[1];
-
-					output = templateString
-						.replace(/\[TEXT\]/g, linkText)
-						.replace(/\[URL\]/g, linkUrl);
-
-					// 最後の項目から <br> を削除するオプション
-					if (tagInfo.removeLastBr) {
-						output = output.replace(/<br\s*\/?\s*>\s*$/i, '').trimEnd();
-					}
-				} else {
-					// 複数リンク: [LINK_LIST]を使用
+				if (usesLinkList) {
+					// [LINK_LIST]を使用する場合（リンク数に関わらず）
 					const linkItems = [];
 					const linkItemTemplate = tagInfo.linkItemTemplate || '<li class="rtoc-item"><a href="[URL]">[TEXT]</a></li>';
 
@@ -2010,6 +1998,22 @@ document.addEventListener("DOMContentLoaded", function () {
 
 					const linkListContent = linkItems.join("\n");
 					output = templateString.replace(/\[LINK_LIST\]/g, linkListContent.trim());
+				} else if (usesSingleLink) {
+					// [TEXT]と[URL]を使用する場合
+					const linkText = lines[0];
+					const linkUrl = lines[1];
+
+					output = templateString
+						.replace(/\[TEXT\]/g, linkText)
+						.replace(/\[URL\]/g, linkUrl);
+
+					// 最後の項目から <br> を削除するオプション
+					if (tagInfo.removeLastBr) {
+						output = output.replace(/<br\s*\/?\s*>\s*$/i, '').trimEnd();
+					}
+				} else {
+					// どちらのプレースホルダーも見つからない場合は警告
+					output = `<!-- 警告: テンプレートに [TEXT]+[URL] または [LINK_LIST] のプレースホルダーが見つかりません -->\n`;
 				}
 			}
 		} else if (tagType === "code") {
