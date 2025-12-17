@@ -408,7 +408,7 @@ document.addEventListener("DOMContentLoaded", function () {
 		const allowedTags = ['p', 'div', 'span', 'strong', 'b', 'em', 'i', 'u', 'mark', 'a', 'br', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'code', 'pre'];
 		const allowedAttributes = {
 			'a': ['href', 'title'],
-			'*': ['class', 'id', 'data-highlight', 'data-tag-id', 'data-placeholder']
+			'*': ['class', 'id', 'data-highlight', 'data-tag-id', 'data-placeholder', 'style']
 		};
 
 		// 危険なプロトコルをブロック
@@ -505,6 +505,7 @@ document.addEventListener("DOMContentLoaded", function () {
 	const defaultFormattingMap = {
 		bold: { template: "<strong>[TEXT]</strong>", displayName: "太字 (Bold)" },
 		highlight: { template: "<mark>[TEXT]</mark>", displayName: "ハイライト (Highlight)" },
+		red: { template: '<span style="color: red;">[TEXT]</span>', displayName: "赤文字 (Red)" },
 	};
 
 	const defaultTagButtons = [
@@ -643,7 +644,8 @@ document.addEventListener("DOMContentLoaded", function () {
 			const allGroups = container.querySelectorAll(".input-area-group");
 
 			allGroups.forEach((group) => {
-				const textarea = group.querySelector(".input-text-area");
+				// :scope > を使用して、直接の子要素のみを取得（ネストされた子孫要素を除外）
+				const textarea = group.querySelector(":scope > .input-text-area");
 				if (textarea) {
 				const tagId = textarea.getAttribute("data-tag-id");
 				const tagInfo = getCustomTagInfo(tagId);
@@ -734,11 +736,20 @@ document.addEventListener("DOMContentLoaded", function () {
 				}
 
 				// 入力エリアを復元
+				// 古いID -> 新しいID のマッピングを保持
+				const idMapping = new Map();
+
 				areas.forEach((area) => {
 					try {
 						const tagInfo = getCustomTagInfo(area.tagId);
 						if (tagInfo) {
-							createTextarea(area.tagId, tagInfo.tagType, tagInfo.name, area.content, area.customName);
+							const oldGroupId = area.groupId;
+							const newGroup = createTextarea(area.tagId, tagInfo.tagType, tagInfo.name, area.content, area.customName);
+
+							// 古いIDと新しいIDをマッピング
+							if (oldGroupId && newGroup && newGroup.id) {
+								idMapping.set(oldGroupId, newGroup.id);
+							}
 						} else {
 							console.warn(`タグID "${area.tagId}" が見つかりません。スキップします。`);
 						}
@@ -747,6 +758,53 @@ document.addEventListener("DOMContentLoaded", function () {
 						// 一部のエリアが失敗しても続行
 					}
 				});
+
+				// コンテナの子エリアIDを新しいIDに更新
+				setTimeout(() => {
+					const allContainers = container.querySelectorAll('.container-child-areas');
+					allContainers.forEach(childAreasInput => {
+						const oldIds = (childAreasInput.value || '').split(',').filter(id => id.trim());
+						const newIds = oldIds.map(oldId => idMapping.get(oldId) || oldId).filter(id => id);
+
+						if (newIds.length > 0) {
+							childAreasInput.value = newIds.join(',');
+
+							// 新しいIDで子エリアを移動させる
+							const containerGroup = childAreasInput.closest('.input-area-group');
+							if (containerGroup) {
+								const childrenZone = containerGroup.querySelector('.container-children-zone');
+								const placeholderMsg = containerGroup.querySelector('.container-placeholder');
+
+								if (childrenZone) {
+									newIds.forEach(newId => {
+										const childArea = document.getElementById(newId);
+										if (childArea && !childrenZone.contains(childArea)) {
+											childrenZone.appendChild(childArea);
+											childArea.style.marginLeft = "0px";
+											childArea.style.opacity = "0.95";
+
+											// プレースホルダーを非表示
+											if (placeholderMsg) {
+												placeholderMsg.style.display = "none";
+											}
+
+											// チェックボックスも更新
+											const checkboxContainer = containerGroup.querySelector('.container-checkbox-list');
+											if (checkboxContainer) {
+												const checkbox = checkboxContainer.querySelector(`input[type=checkbox][value="${newId}"]`);
+												if (checkbox) {
+													checkbox.checked = true;
+												}
+											}
+										}
+									});
+								}
+							}
+						}
+					});
+
+					updateInsertionPoints();
+				}, 150);
 			} catch (parseError) {
 				console.error("入力エリアの解析に失敗しました:", parseError);
 				alert('入力エリアのデータが破損しています。新規作成してください。');
@@ -956,6 +1014,10 @@ document.addEventListener("DOMContentLoaded", function () {
 				// 古いパターンから italic と underline を削除
 				delete patterns[id].formattingMap.italic;
 				delete patterns[id].formattingMap.underline;
+				// 後方互換性：古いパターンに red がない場合は追加
+				if (!patterns[id].formattingMap.red) {
+					patterns[id].formattingMap.red = JSON.parse(JSON.stringify(defaultFormattingMap.red));
+				}
 			}
 			// 後方互換性：入力エリアがない古いパターンに空の配列を追加
 			if (!patterns[id].inputAreas) {
@@ -2302,6 +2364,75 @@ document.addEventListener("DOMContentLoaded", function () {
 						openTag = `<${formattingMap.highlight.tag} data-highlight="true">`;
 						closeTag = `</${formattingMap.highlight.tag}>`;
 					}
+				} else if (tagName === "span" && formattingMap.red) {
+					// 赤文字の検出（Word の赤文字は span の color として来る）
+					let color = null;
+
+					// style.color から取得を試みる
+					if (node.style.color) {
+						color = node.style.color.toLowerCase();
+					}
+
+					// style属性から直接パースを試みる（Wordの場合こちらの方が多い）
+					if (!color) {
+						const styleAttr = node.getAttribute('style');
+						if (styleAttr) {
+							const colorMatch = styleAttr.match(/color:\s*([^;]+)/i);
+							if (colorMatch) {
+								color = colorMatch[1].trim().toLowerCase();
+							}
+						}
+					}
+
+					if (color) {
+						let isRed = false;
+
+						// 色が赤系かどうかをチェック
+						if (color === 'red') {
+							isRed = true;
+						} else if (color.startsWith('rgb')) {
+							// RGB形式: rgb(238, 0, 0) など
+							const rgbMatch = color.match(/rgba?\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
+							if (rgbMatch) {
+								const r = parseInt(rgbMatch[1]);
+								const g = parseInt(rgbMatch[2]);
+								const b = parseInt(rgbMatch[3]);
+								// 赤が強く、緑と青が弱い場合を赤とみなす
+								if (r > 200 && g < 100 && b < 100) {
+									isRed = true;
+								}
+							}
+						} else if (color.startsWith('#')) {
+							// Hex形式: #EE0000, #ff0000 など
+							let r, g, b;
+							if (color.length === 4) {
+								// #RGB形式
+								r = parseInt(color[1] + color[1], 16);
+								g = parseInt(color[2] + color[2], 16);
+								b = parseInt(color[3] + color[3], 16);
+							} else if (color.length === 7) {
+								// #RRGGBB形式
+								r = parseInt(color.substring(1, 3), 16);
+								g = parseInt(color.substring(3, 5), 16);
+								b = parseInt(color.substring(5, 7), 16);
+							}
+							// 赤が強く、緑と青が弱い場合を赤とみなす
+							if (r > 200 && g < 100 && b < 100) {
+								isRed = true;
+							}
+						}
+
+						if (isRed) {
+							if (formattingMap.red.template) {
+								const tags = extractTagsFromTemplate(formattingMap.red.template);
+								openTag = tags.openTag;
+								closeTag = tags.closeTag;
+							} else if (formattingMap.red.tag) {
+								openTag = `<${formattingMap.red.tag}>`;
+								closeTag = `</${formattingMap.red.tag}>`;
+							}
+						}
+					}
 				} else if (tagName === "a") {
 					// リンクタグを保持（href属性を含む）
 					const href = node.getAttribute("href");
@@ -2530,7 +2661,8 @@ document.addEventListener("DOMContentLoaded", function () {
 		newTextarea.setAttribute("aria-label", `${displayName}のテキスト入力エリア`);
 		newTextarea.setAttribute("data-tag-id", tagId); // タグIDをデータ属性として保持
 		// 初期コンテンツを設定（空の場合は完全に空にしてプレースホルダーを表示）
-		if (initialContent && initialContent.trim() !== "") {
+		// ※コンテナモードの場合は、initialContentは子エリアIDリストなのでtextareaには設定しない
+		if (initialContent && initialContent.trim() !== "" && tagType !== "container") {
 			// XSS対策: 保存されたコンテンツをサニタイズしてから設定
 			newTextarea.innerHTML = sanitizeHTML(initialContent);
 		}
@@ -2938,6 +3070,8 @@ document.addEventListener("DOMContentLoaded", function () {
 		updateInsertionPoints();
 		insertionPointSelector.value = groupDiv.id;
 		saveInputAreas(); // 作成後に保存
+
+		return groupDiv; // グループ要素を返す（loadInputAreasで使用）
 	};
 
 	// ========================================

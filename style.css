@@ -201,6 +201,11 @@ body {
 	padding: 0 2px;
 }
 
+/* 入力エリア内の赤文字を赤色で表示 */
+.input-text-area span[style*="color: red"] {
+	color: red !important;
+}
+
 /* 入力エリア内のリンクをスタイル表示 */
 .input-text-area a {
 	color: #0066cc;
